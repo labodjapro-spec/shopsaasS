@@ -156,10 +156,10 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
     }
   })
 
-  // ── Injecter devise + market_id dans themeSettings ───────────────────────
-  const proto = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.startsWith('localhost') ? 'http' : 'https'
+  // ── api_base : vide en production (même domaine), localhost en dev ────────
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'
-  const apiBase = `${proto}://${rootDomain}`
+  const isLocal = rootDomain.startsWith('localhost')
+  const apiBase = isLocal ? `http://${rootDomain}` : ''
 
   const builderJson = {
     ...storePage.builder_json,

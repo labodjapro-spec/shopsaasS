@@ -26,7 +26,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const items: NavItem[] = [{ href: '/dashboard', label: 'Accueil', icon: 'home' }]
   if (can(permissions, 'orders.read')) {
     items.push({ href: '/dashboard/orders', label: 'Commandes', icon: 'orders' })
-    items.push({ href: '/dashboard/orders/abandoned-carts', label: 'Paniers abandonnés', icon: 'orders' })
   }
   if (can(permissions, 'products.read')) items.push({ href: '/dashboard/products', label: 'Produits', icon: 'products' })
   if (can(permissions, 'pages.write')) items.push({ href: `/boutiques?parent=${store.id}`, label: 'Pages produits', icon: 'products' })

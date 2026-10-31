@@ -8,7 +8,6 @@ import { ensureOrderFormSettings, calcBundleTotal } from '@/lib/store-builder/fo
 import BundleOffers from '@/components/store-builder/sections/BundleOffers'
 import VariantSelector from './VariantSelector'
 import { getMetaBrowserContext, hasMetaTrackingConsent, trackMetaBrowserEvent } from '@/lib/meta/browser'
-import { getAbandonedCartSessionId, markAbandonedCartConverted, saveAbandonedCart } from '@/lib/abandoned-cart/browser'
 
 const BTN_ANIMATIONS = [
   { id: 'shake', label: 'Secousse' },
@@ -62,33 +61,6 @@ export default function OrderFormRender({ settings, product, storeId, themeSetti
   const total = bundlesEnabled && selectedBundle
     ? calcBundleTotal(unitPrice, finalQty, selectedBundle)
     : unitPrice * finalQty
-
-  useEffect(() => {
-    const productId = product?.id
-    const variantId = product?.variants?.[0]?.id
-    const marketId = themeSettings?.market_id
-    if (
-      sent || !storeId || !productId || !variantId || !marketId ||
-      name.trim().length < 2 || phone.trim().length < 6
-    ) return
-
-    const timer = window.setTimeout(() => {
-      const sessionId = getAbandonedCartSessionId(storeId, String(productId))
-      void saveAbandonedCart({
-        storeId,
-        productId: String(productId),
-        variantId: String(variantId),
-        marketId: String(marketId),
-        sessionId,
-        name,
-        phone,
-        email,
-        city,
-        quantity: finalQty,
-      }, themeSettings?.api_base || '')
-    }, 1200)
-    return () => window.clearTimeout(timer)
-  }, [storeId, product?.id, product?.variants, themeSettings?.market_id, name, phone, email, city, finalQty, sent])
 
 const btnAnimation: BtnAnimation = formSettings.btn_animation || 'pulse'
   const borderR = formSettings.card_border_radius ?? formSettings.border_radius ?? 20
@@ -164,27 +136,10 @@ const btnAnimation: BtnAnimation = formSettings.btn_animation || 'pulse'
 
     setLoading(true)
     try {
-      // Si la boutique est sur un sous-domaine, l'API est sur le domaine racine
       const apiBase = themeSettings?.api_base || ''
       const trackingConsent = storeId ? hasMetaTrackingConsent(storeId) : false
       const metaBrowserContext = trackingConsent ? getMetaBrowserContext() : {}
-      const cartSessionId = storeId && product?.id && name.trim().length >= 2 && phone.trim().length >= 6
-        ? getAbandonedCartSessionId(storeId, String(product.id))
-        : null
-      if (cartSessionId && storeId && product?.id && product?.variants?.[0]?.id && themeSettings?.market_id) {
-        void saveAbandonedCart({
-          storeId,
-          productId: String(product.id),
-          variantId: String(product.variants[0].id),
-          marketId: String(themeSettings.market_id),
-          sessionId: cartSessionId,
-          name,
-          phone,
-          email,
-          city,
-          quantity: finalQty,
-        })
-      }
+
       const res = await fetch(`${apiBase}/api/orders/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -203,24 +158,21 @@ const btnAnimation: BtnAnimation = formSettings.btn_animation || 'pulse'
           store_id: storeId || s.store_id || themeSettings?.store_id || null,
           market_id: themeSettings?.market_id || null,
           marketing_consent: trackingConsent,
-          abandoned_session_id: cartSessionId,
           ...metaBrowserContext,
-          // variant_id : premier variant du produit pour le décrément de stock
           variant_id: product?.variants?.[0]?.id ?? null,
           variant: Object.keys(variantSelections).length ? variantSelections : null,
         }),
       })
 
-      const contentType = res.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
+      const contentType = res.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
         throw new Error("Erreur serveur inattendue (la réponse n'est pas au format JSON).")
       }
-      
+
       const data = await res.json()
 
       if (!res.ok) {
-        // Afficher le détail technique si disponible (dev only)
-        const msg = data.detail ? `${data.error} — ${data.detail}` : (data.error || 'Impossible d\'enregistrer votre commande.')
+        const msg = data.detail ? `${data.error} — ${data.detail}` : (data.error || "Impossible d'enregistrer votre commande.")
         throw new Error(msg)
       }
 
@@ -235,14 +187,6 @@ const btnAnimation: BtnAnimation = formSettings.btn_animation || 'pulse'
           num_items: finalQty,
           order_id: String(data.order_id || data.number || ''),
         }, typeof data.event_id === 'string' ? data.event_id : undefined)
-      }
-      if (cartSessionId && data.order_id && storeId && product?.id) {
-        void markAbandonedCartConverted({
-          storeId,
-          productId: String(product.id),
-          sessionId: cartSessionId,
-          orderId: String(data.order_id),
-        }, apiBase)
       }
     } catch (err: any) {
       console.error('[Order Submit Error]:', err)

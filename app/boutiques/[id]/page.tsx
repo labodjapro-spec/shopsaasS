@@ -161,10 +161,10 @@ export default async function StoreBuilderPage({ params }: { params: Promise<{ i
     }
   }
 
-  // ── Injecter market_id + currency + store_id + api_base dans themeSettings ──
-  const proto = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.startsWith('localhost') ? 'http' : 'https'
+  // ── api_base : vide en production (même domaine), localhost en dev ────────
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'
-  const apiBase = `${proto}://${rootDomain}`
+  const isLocal = rootDomain.startsWith('localhost')
+  const apiBase = isLocal ? `http://${rootDomain}` : ''
 
   builderJson = {
     ...builderJson,

@@ -55,39 +55,42 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
   return (
     <>
       <div className="divide-y divide-zinc-100 md:hidden">
-        {orders.map(order => (
-          <button
-            key={order.id}
-            type="button"
-            onClick={() => openOrder(order.id)}
-            className="block w-full p-4 text-left transition hover:bg-zinc-50 focus:bg-violet-50 focus:outline-none"
-            aria-label={`Commande ${order.order_number}, ${order.customer_name}, ${STATUS_LABELS[order.status] ?? order.status}, ${formatMoney(order.total, order.markets?.currency ?? 'XOF')}`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-extrabold text-zinc-900">{order.order_number}</p>
-                <p className="mt-1 truncate text-sm font-semibold text-zinc-700">{order.customer_name}</p>
+        {orders.map(order => {
+          const style = ROW_STYLES[order.status] ?? ROW_STYLES.new
+          return (
+            <button
+              key={order.id}
+              type="button"
+              onClick={() => openOrder(order.id)}
+              className={`block w-full p-4 text-left transition focus:outline-none ${style.row}`}
+              aria-label={`Commande ${order.order_number}, ${order.customer_name}, ${STATUS_LABELS[order.status] ?? order.status}, ${formatMoney(order.total, order.markets?.currency ?? 'XOF')}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={`truncate text-sm font-extrabold ${style.text}`}>{order.order_number}</p>
+                  <p className={`mt-1 truncate text-sm font-semibold ${style.text}`}>{order.customer_name}</p>
+                </div>
+                <p className={`shrink-0 text-right text-sm font-black ${style.text}`}>
+                  {formatMoney(order.total, order.markets?.currency ?? 'XOF')}
+                </p>
               </div>
-              <p className="shrink-0 text-right text-sm font-black text-zinc-900">
-                {formatMoney(order.total, order.markets?.currency ?? 'XOF')}
-              </p>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${STATUS_BADGES[order.status] ?? STATUS_BADGES.new}`}>
-                {STATUS_LABELS[order.status] ?? order.status}
-              </span>
-              <span className="text-xs text-zinc-500">{order.customer_phone}</span>
-            </div>
-            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-zinc-400">
-              <span className="truncate">{order.customer_city || 'Ville non indiquée'}</span>
-              <time className="shrink-0">
-                {new Date(order.created_at).toLocaleDateString('fr-FR', {
-                  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                })}
-              </time>
-            </div>
-          </button>
-        ))}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${style.badge}`}>
+                  {STATUS_LABELS[order.status] ?? order.status}
+                </span>
+                <span className={`text-xs ${style.sub}`}>{order.customer_phone}</span>
+              </div>
+              <div className={`mt-2 flex items-center justify-between gap-3 text-xs ${style.sub}`}>
+                <span className="truncate">{order.customer_city || 'Ville non indiquée'}</span>
+                <time className="shrink-0">
+                  {new Date(order.created_at).toLocaleDateString('fr-FR', {
+                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                  })}
+                </time>
+              </div>
+            </button>
+          )
+        })}
       </div>
 
       <div className="hidden overflow-x-auto md:block">

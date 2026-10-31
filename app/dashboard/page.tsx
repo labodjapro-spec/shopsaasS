@@ -211,19 +211,10 @@ export default async function DashboardHome({
               {store.name}
             </p>
             <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
-              Bonjour{firstName ? `, ${firstName}` : ''} 👋
+              {firstName ? `${firstName}` : 'Bonjour'} 👋
             </h1>
             <p className="mt-1 text-sm text-zinc-500">Vue d&apos;ensemble de ta boutique</p>
           </div>
-          <a
-            href={storeUrl(store.slug)}
-            target="_blank"
-            rel="noreferrer"
-            className="group inline-flex items-center gap-2 rounded-xl bg-white border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:border-violet-300 hover:text-violet-700 hover:shadow-md transition-all duration-200"
-          >
-            Voir ma boutique
-            <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </a>
         </div>
 
         {/* ── Metric cards ── */}
