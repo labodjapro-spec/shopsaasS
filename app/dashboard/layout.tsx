@@ -29,7 +29,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
   if (can(permissions, 'products.read')) items.push({ href: '/dashboard/products', label: 'Produits', icon: 'products' })
   if (can(permissions, 'pages.write')) items.push({ href: `/boutiques?parent=${store.id}`, label: 'Pages produits', icon: 'products' })
-  if (can(permissions, 'team.write')) items.push({ href: '/dashboard/team', label: 'Équipe', icon: 'team', mobileHide: true })
+  if (can(permissions, 'team.write')) items.push({ href: '/dashboard/team', label: 'Équipe', icon: 'team' })
   if (can(permissions, 'settings.write')) items.push({ href: '/dashboard/settings', label: 'Réglages', icon: 'settings' })
 
   const userLabel = (user.user_metadata?.full_name as string | undefined) || user.email || 'Moi'
