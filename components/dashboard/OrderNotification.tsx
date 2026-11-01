@@ -59,11 +59,9 @@ async function showBrowserNotif(title: string, body: string, url?: string, order
     body,
     icon: '/icons/app-192.png',
     badge: '/icons/app-192.png',
-    // Tag unique par commande — évite les doublons même si appelé 2x
     tag: orderId ? `order-${orderId}` : 'new-order',
     data: { url: url || '/dashboard/orders' },
     requireInteraction: true,
-    renotify: false, // ne pas notifier si même tag déjà affiché
   }
   try {
     if ('serviceWorker' in navigator) {
