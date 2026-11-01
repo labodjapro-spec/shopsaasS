@@ -65,7 +65,7 @@ export function Sidebar({
       const appearance = JSON.parse(window.localStorage.getItem('shopsaas-dashboard-appearance') || '{}')
       if (appearance.mode === 'dark' || appearance.mode === 'light') setDashboardMode(appearance.mode)
       if (typeof appearance.sidebarColor === 'string' && /^#[0-9a-f]{6}$/i.test(appearance.sidebarColor)) setSidebarColor(appearance.sidebarColor)
-    } catch { /* garder les réglages par défaut */ }
+    } catch { /* garder les rÃƒÂ©glages par dÃƒÂ©faut */ }
     return () => {
       document.documentElement.classList.remove('dashboard-sidebar-collapsed')
       document.body.classList.remove('dashboard-dark')
@@ -98,16 +98,16 @@ export function Sidebar({
 
   const appearancePanel = appearanceOpen ? (
     <section
-      aria-label="Personnaliser l’apparence"
+      aria-label="Personnaliser lÃ¢â‚¬â„¢apparence"
       className="dashboard-appearance-panel fixed bottom-24 left-3 z-[60] w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border p-4 shadow-2xl md:bottom-4"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-bold">Apparence</h2>
-          <p className="mt-1 text-sm dashboard-muted">Change l’ambiance de toute la barre.</p>
+          <p className="mt-1 text-sm dashboard-muted">Change lÃ¢â‚¬â„¢ambiance de toute la barre.</p>
         </div>
-        <button type="button" onClick={() => setAppearanceOpen(false)} className="rounded-lg px-2 py-1 text-sm dashboard-muted hover:bg-black/5" aria-label="Fermer les réglages">
-          ✕
+        <button type="button" onClick={() => setAppearanceOpen(false)} className="rounded-lg px-2 py-1 text-sm dashboard-muted hover:bg-black/5" aria-label="Fermer les rÃƒÂ©glages">
+          Ã¢Å“â€¢
         </button>
       </div>
 
@@ -132,7 +132,7 @@ export function Sidebar({
 
       <div className="mt-4">
         <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold">Couleur de la barre entière</p>
+          <p className="text-sm font-semibold">Couleur de la barre entiÃƒÂ¨re</p>
           <button
             type="button"
             onClick={() => setSidebarColor('')}
@@ -155,9 +155,9 @@ export function Sidebar({
             />
           ))}
           <label className="flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold">
-            <span>Personnalisée</span>
+            <span>PersonnalisÃƒÂ©e</span>
             <input
-              aria-label="Choisir la couleur de toute la barre latérale"
+              aria-label="Choisir la couleur de toute la barre latÃƒÂ©rale"
               type="color"
               value={sidebarColor || (dashboardMode === 'dark' ? '#191a25' : '#ffffff')}
               onChange={event => setSidebarColor(event.target.value)}
@@ -182,8 +182,8 @@ export function Sidebar({
           <button
             type="button"
             onClick={toggleSidebar}
-            title={collapsed ? 'Ouvrir la barre latérale' : 'Réduire la barre latérale'}
-            aria-label={collapsed ? 'Ouvrir la barre latérale' : 'Réduire la barre latérale'}
+            title={collapsed ? 'Ouvrir la barre latÃƒÂ©rale' : 'RÃƒÂ©duire la barre latÃƒÂ©rale'}
+            aria-label={collapsed ? 'Ouvrir la barre latÃƒÂ©rale' : 'RÃƒÂ©duire la barre latÃƒÂ©rale'}
             className={`dashboard-sidebar-control absolute top-5 flex size-8 items-center justify-center rounded-lg border shadow-sm transition ${collapsed ? '-right-3' : 'right-3'}`}
           >
             {collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
@@ -237,16 +237,16 @@ export function Sidebar({
               onClick={() => setAppearanceOpen(open => !open)}
               aria-expanded={appearanceOpen}
               className="dashboard-sidebar-control flex min-h-11 flex-1 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition hover:bg-black/5"
-              title="Personnaliser l’apparence"
+              title="Personnaliser lÃ¢â‚¬â„¢apparence"
             >
               <Palette className="size-5 shrink-0" />
               {!collapsed && <span>Apparence</span>}
             </button>
             <form action={logoutAction}>
               <button
-                aria-label="Se déconnecter"
+                aria-label="Se dÃƒÂ©connecter"
                 className="dashboard-sidebar-control flex size-11 items-center justify-center rounded-xl transition"
-                title="Se déconnecter"
+                title="Se dÃƒÂ©connecter"
               >
                 <LogOut className="size-5" />
               </button>
@@ -259,12 +259,12 @@ export function Sidebar({
       <div className="dashboard-sidebar sticky top-0 z-30 border-b md:hidden">
         <header className="flex items-center justify-between gap-2 px-3 py-2.5">
           <div className="dashboard-store-switcher min-w-0 flex-1">{storeSwitcher}</div>
-          <button type="button" onClick={() => setAppearanceOpen(open => !open)} aria-label="Personnaliser l’apparence" aria-expanded={appearanceOpen} className="dashboard-sidebar-control flex size-10 items-center justify-center rounded-xl border">
+          <button type="button" onClick={() => setAppearanceOpen(open => !open)} aria-label="Personnaliser lÃ¢â‚¬â„¢apparence" aria-expanded={appearanceOpen} className="dashboard-sidebar-control flex size-10 items-center justify-center rounded-xl border">
             <Palette className="size-5" />
           </button>
           <InstallAppButton />
           <form action={logoutAction}>
-            <button aria-label="Se déconnecter" className="dashboard-sidebar-control rounded-lg p-2" title="Se déconnecter">
+            <button aria-label="Se dÃƒÂ©connecter" className="dashboard-sidebar-control rounded-lg p-2" title="Se dÃƒÂ©connecter">
               <LogOut className="size-5" />
             </button>
           </form>
