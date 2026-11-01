@@ -9,14 +9,20 @@ const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'
 
 function corsHeaders(req: NextRequest) {
   const origin = req.headers.get('origin') ?? ''
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'
+  const isLocal = rootDomain.startsWith('localhost')
+
   const allowed =
-    origin.endsWith(`.${ROOT_DOMAIN}`) ||
-    origin === `http://${ROOT_DOMAIN}` ||
-    origin === `https://${ROOT_DOMAIN}` ||
-    origin.startsWith('http://localhost:') ||
-    origin === 'http://localhost'
+    // Même domaine stable
+    origin === `https://${rootDomain}` ||
+    origin === `http://${rootDomain}` ||
+    // Toutes les URLs de preview Vercel du même projet (*.vercel.app)
+    origin.endsWith('.vercel.app') ||
+    // Local
+    (isLocal && (origin.startsWith('http://localhost:') || origin.startsWith(`http://${rootDomain}`)))
+
   return {
-    'Access-Control-Allow-Origin': allowed ? origin : '',
+    'Access-Control-Allow-Origin': allowed ? origin : `https://${rootDomain}`,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   }
