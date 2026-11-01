@@ -6,3 +6,5 @@ node_modules
 PUSH-VALUES.txt
 .env
 .vscode
+supabase/.temp
+supabase/functions/push-order/.env
