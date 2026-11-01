@@ -205,16 +205,11 @@ export default async function DashboardHome({
         )}
 
         {/* ── Header ── */}
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-violet-500 mb-1">
-              {store.name}
-            </p>
-            <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
-              {firstName ? `${firstName}` : 'Bonjour'} 👋
-            </h1>
-            <p className="mt-1 text-sm text-zinc-500">Vue d&apos;ensemble de ta boutique</p>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
+            {firstName ? `${firstName}` : 'Bonjour'} 👋
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">Vue d&apos;ensemble de ta boutique</p>
         </div>
 
         {/* ── Metric cards ── */}

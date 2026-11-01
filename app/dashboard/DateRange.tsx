@@ -166,9 +166,10 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
       </button>
 
       {open && (
-        <div className={`absolute top-11 z-50 flex flex-col sm:flex-row gap-0 rounded-2xl border border-zinc-200 bg-white shadow-2xl overflow-hidden ${align === 'left' ? 'left-0' : 'right-0'}`} style={{ minWidth: 520 }}>
+        <div className={`absolute top-11 z-50 flex flex-col sm:flex-row gap-0 rounded-2xl border border-zinc-200 bg-white shadow-2xl overflow-hidden ${align === 'left' ? 'left-0' : 'right-0'}`}
+          style={{ minWidth: 'min(100vw - 1rem, 520px)', maxWidth: '100vw' }}>
           {/* Colonne gauche — presets */}
-          <div className="border-r border-zinc-100 p-3 min-w-[160px] bg-zinc-50/60">
+          <div className="border-b sm:border-b-0 sm:border-r border-zinc-100 p-3 sm:min-w-[160px] bg-zinc-50/60">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400 px-2">Raccourcis</p>
             {PRESETS.map(preset => (
               <button
@@ -203,15 +204,10 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
             </button>
           </div>
 
-          {/* Colonne droite — double calendrier */}
+          {/* Calendrier — un mois sur mobile, deux sur desktop */}
           <div className="flex flex-col p-4 gap-3">
-            {/* Header calendrier */}
             <div className="flex items-center justify-between mb-1">
-              <button
-                type="button"
-                onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() - 1, 1))}
-                className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors text-zinc-500"
-              >
+              <button type="button" onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() - 1, 1))} className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors text-zinc-500">
                 <ChevronLeft className="size-4" />
               </button>
               {fromParam && !toParam && (
@@ -219,65 +215,33 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
                   Sélectionnez la date de fin
                 </span>
               )}
-              {!fromParam && (
-                <span className="text-xs text-zinc-400">Cliquez pour choisir la période</span>
-              )}
+              {!fromParam && <span className="text-xs text-zinc-400">Choisir la période</span>}
               {fromParam && toParam && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = new URLSearchParams(params.toString())
-                    next.delete('from'); next.delete('to')
-                    next.set('range', 'custom')
-                    router.push(`?${next.toString()}`)
-                  }}
-                  className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-500 transition-colors"
-                >
+                <button type="button" onClick={() => { const next = new URLSearchParams(params.toString()); next.delete('from'); next.delete('to'); next.set('range', 'custom'); router.push(`?${next.toString()}`) }} className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-500 transition-colors">
                   <X className="size-3" /> Réinitialiser
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() + 1, 1))}
-                className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors text-zinc-500"
-              >
+              <button type="button" onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() + 1, 1))} className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors text-zinc-500">
                 <ChevronRight className="size-4" />
               </button>
             </div>
 
-            {/* Deux mois côte à côte */}
+            {/* Un mois sur mobile, deux sur sm+ */}
             <div className="flex gap-6" onMouseLeave={() => setHovering('')}>
-              <MonthGrid
-                month={leftMonth}
-                from={fromParam}
-                to={toParam}
-                hovering={hovering}
-                onPick={pickDate}
-                onHover={setHovering}
-              />
-              <MonthGrid
-                month={rightMonth}
-                from={fromParam}
-                to={toParam}
-                hovering={hovering}
-                onPick={pickDate}
-                onHover={setHovering}
-              />
+              <MonthGrid month={leftMonth} from={fromParam} to={toParam} hovering={hovering} onPick={pickDate} onHover={setHovering} />
+              <div className="hidden sm:block">
+                <MonthGrid month={rightMonth} from={fromParam} to={toParam} hovering={hovering} onPick={pickDate} onHover={setHovering} />
+              </div>
             </div>
 
-            {/* Sélection en cours */}
             {fromParam && (
               <div className="border-t border-zinc-100 pt-3 flex items-center justify-between text-xs text-zinc-500">
                 <span>
-                  {fromParam && <span className="font-semibold text-violet-700">{new Date(fromParam).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
-                  {toParam && <> → <span className="font-semibold text-violet-700">{new Date(toParam).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span></>}
+                  {fromParam && <span className="font-semibold text-violet-700">{new Date(fromParam).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>}
+                  {toParam && <> → <span className="font-semibold text-violet-700">{new Date(toParam).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span></>}
                 </span>
                 {fromParam && toParam && (
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    className="bg-violet-600 text-white rounded-lg px-3 py-1.5 font-semibold hover:bg-violet-700 transition-colors"
-                  >
+                  <button type="button" onClick={() => setOpen(false)} className="bg-violet-600 text-white rounded-lg px-3 py-1.5 font-semibold hover:bg-violet-700 transition-colors">
                     Appliquer
                   </button>
                 )}
