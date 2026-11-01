@@ -215,7 +215,9 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
     )
   }, [soundEnabled])
 
-  // ── Supabase Realtime (temps réel instantané) ────────────────────────────
+  // ── Supabase Realtime — toast + son quand dashboard ouvert ──────────────
+  // La Edge Function Supabase gère déjà les push quand l'app est fermée.
+  // Ici on gère seulement le toast/son (pas de notification push navigateur).
   useEffect(() => {
     const channel = supabase
       .channel(`orders:${storeId}`)
@@ -229,53 +231,34 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
         },
         async (payload) => {
           const o = payload.new as any
+          if (knownIds.current.has(o.id)) return
+          knownIds.current.add(o.id)
+          try {
+            const arr = Array.from(knownIds.current).slice(-100)
+            sessionStorage.setItem('shopsaas-known-orders', JSON.stringify(arr))
+          } catch { /* silencieux */ }
+
           const { data: market } = o.market_id
             ? await supabase.from('markets').select('currency').eq('id', o.market_id).maybeSingle()
             : { data: null }
-          handleNewOrder({
+
+          const order = {
             id: o.id,
             order_number: o.order_number ?? `#${o.id.slice(0, 6).toUpperCase()}`,
             customer_name: o.customer_name ?? 'Client',
             total: Number(o.total) || 0,
             currency: market?.currency ?? 'XOF',
-          })
+          }
+
+          // Son + toast uniquement (pas de push navigateur — la Edge Function s'en charge)
+          if (soundEnabled) playOrderSound(audioRef.current)
+          showOrderToast(order)
         },
       )
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [storeId, handleNewOrder, supabase])
-
-  // ── Polling de secours (toutes les 15 secondes) ──────────────────────────
-  useEffect(() => {
-    startedAt.current = new Date().toISOString()
-    knownIds.current.clear()
-    const poll = async () => {
-      try {
-        const res = await fetch(
-          `/api/orders/poll?store_id=${storeId}&since=${encodeURIComponent(startedAt.current)}`,
-          { cache: 'no-store' },
-        )
-        if (!res.ok) return
-        const { orders } = await res.json()
-        if (!orders?.length) return
-        const newest = orders.reduce((latest: string, order: any) =>
-          order.created_at && order.created_at > latest ? order.created_at : latest,
-          startedAt.current,
-        )
-        startedAt.current = newest
-        orders.forEach((o: any) => handleNewOrder(o))
-      } catch { /* silencieux */ }
-    }
-
-    // Polling après 8s puis toutes les 15s
-    const t = setTimeout(poll, 8_000)
-    pollRef.current = setInterval(poll, 15_000)
-    return () => {
-      clearTimeout(t)
-      if (pollRef.current) clearInterval(pollRef.current)
-    }
-  }, [storeId, handleNewOrder])
+  }, [storeId, soundEnabled, supabase])
 
   function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4)
@@ -364,22 +347,34 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
   }
 
   // ── Bandeau d'activation simplifié ─────────────────────────────────────
-  if (mounted && !promptDismissed && !pushEnabled) {
+  if (mounted && !promptDismissed && (!soundEnabled || !pushEnabled)) {
     return (
       <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-2rem)] max-w-sm">
         <div className="flex items-center justify-between gap-3 rounded-2xl bg-zinc-900 px-4 py-3 text-white shadow-2xl">
           <div className="flex items-center gap-2.5 min-w-0">
             <Bell className="size-5 shrink-0 text-violet-400" />
-            <p className="text-sm font-medium leading-tight">Activer les alertes commandes</p>
+            <p className="text-sm font-medium leading-tight">
+              {!soundEnabled ? 'Activer le son des commandes' : 'Activer les alertes commandes'}
+            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={enablePush}
-              disabled={pushBusy}
-              className="rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
-            >
-              {pushBusy ? '…' : 'Activer'}
-            </button>
+            {!soundEnabled && (
+              <button
+                onClick={enableSound}
+                className="rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-violet-700"
+              >
+                Son
+              </button>
+            )}
+            {!pushEnabled && (
+              <button
+                onClick={enablePush}
+                disabled={pushBusy}
+                className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {pushBusy ? '…' : 'Push'}
+              </button>
+            )}
             <button
               onClick={() => setPromptDismissed(true)}
               className="text-xs text-zinc-400 hover:text-white px-1"
