@@ -136,19 +136,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Le produit ne correspond pas à cette boutique.' }, { status: 400, headers })
       }
     }
-    if (variant_id) {
-      const { data: variantPrice } = await supabase
-        .from('variant_prices')
-        .select('variant_id')
-        .eq('variant_id', variant_id)
-        .eq('market_id', resolvedMarketId)
-        .eq('store_id', store_id)
-        .maybeSingle()
-      if (!variantPrice) {
-        return NextResponse.json({ error: 'La variante ne correspond pas à ce produit et à ce marché.' }, { status: 400, headers })
-      }
-    }
-
     const lines = variant_id
       ? [{ variant_id, quantity: quantity ?? 1, price: price ?? 0 }]
       : [{ title: product ?? 'Produit', quantity: quantity ?? 1, price: price ?? 0 }]
