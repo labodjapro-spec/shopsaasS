@@ -1,7 +1,9 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
-import { logActivity, requirePerm } from '@/lib/context'
+import { revalidatePath, revalidateTag } from 'next/cache'
+import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import { logActivity, requirePerm, STORE_COOKIE } from '@/lib/context'
 import type { FormState } from '@/lib/form'
 
 export async function saveSettings(_: FormState, fd: FormData): Promise<FormState> {
@@ -19,4 +21,29 @@ export async function saveSettings(_: FormState, fd: FormData): Promise<FormStat
   await logActivity(store.id, 'settings.updated')
   revalidatePath('/dashboard', 'layout')
   return { message: 'Réglages enregistrés.' }
+}
+
+export async function deleteStore(_: FormState): Promise<FormState> {
+  const { supabase, store, user } = await requirePerm('settings.write')
+
+  // Seul le propriétaire peut supprimer
+  if (store.owner_id !== user.id) return { error: 'Seul le propriétaire peut supprimer la boutique.' }
+
+  // Supprimer dans l'ordre (FK constraints)
+  await supabase.from('store_pages').delete().eq('store_id', store.id)
+  await supabase.from('store_members').delete().eq('store_id', store.id)
+  await supabase.from('markets').delete().eq('store_id', store.id)
+  await supabase.from('orders').delete().eq('store_id', store.id)
+  await supabase.from('products').delete().eq('store_id', store.id)
+  await supabase.from('roles').delete().eq('store_id', store.id)
+  await supabase.from('store_settings').delete().eq('store_id', store.id)
+  const { error } = await supabase.from('stores').delete().eq('id', store.id).eq('owner_id', user.id)
+
+  if (error) return { error: 'Suppression impossible : ' + error.message }
+
+  // Effacer le cookie de boutique courante
+  const jar = await cookies()
+  jar.delete(STORE_COOKIE)
+
+  redirect('/onboarding')
 }

@@ -2,15 +2,18 @@ import { requirePerm } from '@/lib/context'
 import { storeUrl } from '@/lib/utils'
 import { ActionForm, SubmitButton } from '@/components/form'
 import { Card, Field, Input, PageHeader } from '@/components/ui'
-import { saveSettings } from './actions'
+import { saveSettings, deleteStore } from './actions'
 import { LogoField } from './LogoField'
 
 export default async function SettingsPage() {
   const { store } = await requirePerm('settings.write')
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl space-y-6">
       <PageHeader title="Réglages" subtitle={storeUrl(store.slug)} />
+
+      {/* Infos générales */}
       <Card>
+        <h2 className="font-semibold text-zinc-900 mb-4">Informations de la boutique</h2>
         <ActionForm action={saveSettings} className="space-y-5">
           <Field label="Nom de la boutique">
             <Input name="name" defaultValue={store.name} required />
@@ -27,6 +30,23 @@ export default async function SettingsPage() {
             </Field>
           </div>
           <SubmitButton>Enregistrer</SubmitButton>
+        </ActionForm>
+      </Card>
+
+      {/* Zone dangereuse */}
+      <Card className="border-red-200 bg-red-50/30">
+        <h2 className="font-semibold text-red-900 mb-1">Zone dangereuse</h2>
+        <p className="text-sm text-red-700 mb-4">
+          La suppression de la boutique est irréversible. Toutes les commandes, produits et pages produits seront définitivement supprimés.
+        </p>
+        <ActionForm action={deleteStore}>
+          <SubmitButton
+            variant="danger"
+            confirm={`Supprimer définitivement la boutique "${store.name}" ? Cette action est irréversible.`}
+            pendingLabel="Suppression…"
+          >
+            Supprimer cette boutique
+          </SubmitButton>
         </ActionForm>
       </Card>
     </div>

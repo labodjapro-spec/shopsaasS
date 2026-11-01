@@ -3,11 +3,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Home, LogOut, Moon, Package, Palette, ShoppingBag, Sun, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Home, LogOut, Moon, Package, Palette, Settings, ShoppingBag, Sun, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import InstallAppButton from '@/app/InstallAppButton'
 
-const ICONS = { home: Home, orders: ShoppingBag, products: Package, team: Users }
+const ICONS = { home: Home, orders: ShoppingBag, products: Package, team: Users, settings: Settings }
 const SIDEBAR_PRESETS = [
   { name: 'Violet clair', value: '#eeeaff' },
   { name: 'Bleu', value: '#2442b8' },
