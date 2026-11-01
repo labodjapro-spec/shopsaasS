@@ -354,27 +354,29 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
     }
   }
 
-  // ── Bouton d'activation des notifications navigateur ────────────────────
-  if (mounted && !promptDismissed && (!soundEnabled || !pushEnabled)) {
+  // ── Bandeau d'activation simplifié ─────────────────────────────────────
+  if (mounted && !promptDismissed && !pushEnabled) {
     return (
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-up">
-        <div className="flex max-w-xl flex-wrap items-center gap-3 rounded-2xl bg-zinc-900 px-4 py-3 text-white shadow-2xl">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            {!soundEnabled ? <Volume2 className="size-5 shrink-0 text-violet-400" /> : <Bell className="size-5 shrink-0 text-violet-400" />}
-            <p className="text-sm font-medium">Active les alertes Push même quand ShopSaaS est fermé, et le son quand le dashboard est ouvert.</p>
+      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-2rem)] max-w-sm">
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-zinc-900 px-4 py-3 text-white shadow-2xl">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Bell className="size-5 shrink-0 text-violet-400" />
+            <p className="text-sm font-medium leading-tight">Activer les alertes commandes</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {!soundEnabled && <button onClick={enableSound} className="rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-violet-700">Activer le son</button>}
-            {!pushEnabled ? (
-              <button onClick={enablePush} disabled={pushBusy} className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60">
-                {pushBusy ? 'Activation…' : 'Push hors app'}
-              </button>
-            ) : (
-              <button onClick={disablePush} disabled={pushBusy} className="rounded-xl bg-white/10 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-white/20">
-                {pushBusy ? 'Mise à jour…' : 'Push activé · désactiver'}
-              </button>
-            )}
-            <button onClick={() => setPromptDismissed(true)} className="px-2 py-1.5 text-xs text-zinc-400 transition-colors hover:text-white">Plus tard</button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={enablePush}
+              disabled={pushBusy}
+              className="rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
+            >
+              {pushBusy ? '…' : 'Activer'}
+            </button>
+            <button
+              onClick={() => setPromptDismissed(true)}
+              className="text-xs text-zinc-400 hover:text-white px-1"
+            >
+              ✕
+            </button>
           </div>
         </div>
       </div>
