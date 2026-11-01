@@ -3,10 +3,13 @@ import { storeUrl } from '@/lib/utils'
 import { ActionForm, SubmitButton } from '@/components/form'
 import { Card, Field, Input, PageHeader } from '@/components/ui'
 import { saveSettings, deleteStore } from './actions'
-import { LogoField } from './LogoField'
+import Link from 'next/link'
+import { Users } from 'lucide-react'
 
 export default async function SettingsPage() {
-  const { store } = await requirePerm('settings.write')
+  const { store, permissions } = await requirePerm('settings.write')
+  const { can } = await import('@/lib/permissions')
+
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader title="Réglages" subtitle={storeUrl(store.slug)} />
@@ -17,9 +20,6 @@ export default async function SettingsPage() {
         <ActionForm action={saveSettings} className="space-y-5">
           <Field label="Nom de la boutique">
             <Input name="name" defaultValue={store.name} required />
-          </Field>
-          <Field label="Logo">
-            <LogoField storeId={store.id} initial={store.logo_url} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Couleur principale">
@@ -32,6 +32,22 @@ export default async function SettingsPage() {
           <SubmitButton>Enregistrer</SubmitButton>
         </ActionForm>
       </Card>
+
+      {/* Équipe — visible sur mobile uniquement (sur desktop c'est dans le sidebar) */}
+      {can(permissions, 'team.write') && (
+        <Card className="md:hidden">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-zinc-900">Équipe</h2>
+              <p className="text-sm text-zinc-500 mt-0.5">Gérer les membres et les rôles</p>
+            </div>
+            <Link href="/dashboard/team" className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors">
+              <Users className="size-4" />
+              Gérer
+            </Link>
+          </div>
+        </Card>
+      )}
 
       {/* Zone dangereuse */}
       <Card className="border-red-200 bg-red-50/30">

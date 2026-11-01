@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronDown, Store } from 'lucide-react'
+import { Store } from 'lucide-react'
 import { switchStore } from './actions'
 
 export function StoreSwitcher({
@@ -10,34 +10,34 @@ export function StoreSwitcher({
   stores: { id: string; name: string }[]
   currentId: string
 }) {
-  const current = stores.find(s => s.id === currentId)
-
   return (
-    <form action={switchStore} className="relative">
-      <div className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center">
-        <Store className="size-3.5 text-zinc-400" />
-      </div>
-      <select
-        name="store_id"
-        defaultValue={currentId}
-        onChange={(e) => {
-          if (e.target.value === '__new') {
-            window.location.href = '/onboarding?new=1'
-            return
-          }
-          e.currentTarget.form?.requestSubmit()
-        }}
-        className="w-full appearance-none truncate rounded-xl bg-transparent py-2 pl-7 pr-7 text-sm font-semibold outline-none cursor-pointer hover:bg-black/5 transition-colors"
-        style={{ maxWidth: '180px' }}
-      >
-        {stores.map((s) => (
-          <option key={s.id} value={s.id}>{s.name}</option>
-        ))}
-        <option value="__new">+ Nouvelle boutique</option>
-      </select>
-      <div className="pointer-events-none absolute inset-y-0 right-1.5 flex items-center">
-        <ChevronDown className="size-3.5 text-zinc-400" />
-      </div>
+    <form action={switchStore} className="w-full">
+      <label className="relative flex items-center gap-2 cursor-pointer w-full rounded-xl px-3 py-2 hover:bg-black/5 transition-colors">
+        <Store className="size-4 shrink-0 opacity-50" />
+        <select
+          name="store_id"
+          defaultValue={currentId}
+          onChange={(e) => {
+            if (e.target.value === '__new') {
+              window.location.href = '/onboarding?new=1'
+              return
+            }
+            e.currentTarget.form?.requestSubmit()
+          }}
+          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+        >
+          {stores.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+          <option value="__new">+ Nouvelle boutique</option>
+        </select>
+        <span className="flex-1 truncate text-sm font-semibold">
+          {stores.find(s => s.id === currentId)?.name ?? 'Ma boutique'}
+        </span>
+        <svg className="size-4 shrink-0 opacity-40" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+        </svg>
+      </label>
     </form>
   )
 }

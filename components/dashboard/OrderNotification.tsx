@@ -53,15 +53,17 @@ async function requestNotifPermission() {
   return perm === 'granted'
 }
 
-async function showBrowserNotif(title: string, body: string, url?: string) {
+async function showBrowserNotif(title: string, body: string, url?: string, orderId?: string) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return
   const options: NotificationOptions = {
     body,
     icon: '/icons/app-192.png',
     badge: '/icons/app-192.png',
-    tag: 'new-order',
+    // Tag unique par commande — évite les doublons même si appelé 2x
+    tag: orderId ? `order-${orderId}` : 'new-order',
     data: { url: url || '/dashboard/orders' },
     requireInteraction: true,
+    renotify: false, // ne pas notifier si même tag déjà affiché
   }
   try {
     if ('serviceWorker' in navigator) {
@@ -136,7 +138,10 @@ interface OrderNotificationProps {
 export default function OrderNotification({ storeId }: OrderNotificationProps) {
   const supabase = useMemo(() => createClient(), [])
   const startedAt = useRef(new Date().toISOString())
-  const knownIds = useRef<Set<string>>(new Set())
+  // Persister les IDs connus en sessionStorage pour survivre aux rechargements
+  const knownIds = useRef<Set<string>>(new Set(
+    JSON.parse(typeof window !== 'undefined' ? (sessionStorage.getItem('shopsaas-known-orders') ?? '[]') : '[]')
+  ))
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(false)
   const [pushEnabled, setPushEnabled] = useState(false)
@@ -186,7 +191,7 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // ── Traiter une nouvelle commande ────────────────────────────────────────
+  // ── Traiter une nouvelle commande ─────────────────────────────────────────
   const handleNewOrder = useCallback((order: {
     id: string
     order_number: string
@@ -196,6 +201,11 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
   }) => {
     if (knownIds.current.has(order.id)) return
     knownIds.current.add(order.id)
+    // Persister pour éviter les doublons après rechargement de page
+    try {
+      const arr = Array.from(knownIds.current).slice(-100)
+      sessionStorage.setItem('shopsaas-known-orders', JSON.stringify(arr))
+    } catch { /* silencieux */ }
 
     if (soundEnabled) playOrderSound(audioRef.current)
     showOrderToast(order)
@@ -203,6 +213,7 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
       `Nouvelle commande ${order.order_number}`,
       `${order.customer_name} · ${order.total.toLocaleString('fr-FR')} ${order.currency}`,
       `/dashboard/orders/${order.id}`,
+      order.id,
     )
   }, [soundEnabled])
 
