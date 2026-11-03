@@ -3,35 +3,33 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Download } from 'lucide-react'
+import {
+  getInstallPrompt,
+  isIosDevice,
+  isStandaloneDisplay,
+  subscribeInstallPrompt,
+  type InstallPromptEvent,
+} from '@/lib/pwa/install'
 
-type InstallPromptEvent = Event & {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
-}
-
-export default function InstallAppButton() {
+export default function InstallAppButton({
+  className,
+  label = 'Installer l’app',
+}: {
+  className?: string
+  label?: string
+}) {
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   const [isIos, setIsIos] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
 
   useEffect(() => {
-    const ua = window.navigator.userAgent
-    const iosDevice = /iPhone|iPad|iPod/i.test(ua) ||
-      (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1)
-    setIsIos(iosDevice && !('MSStream' in window))
-    const standalone = window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-    setIsInstalled(standalone)
-
-    const handler = (event: Event) => {
-      event.preventDefault()
-      setInstallPrompt(event as InstallPromptEvent)
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
+    setIsIos(isIosDevice())
+    setIsInstalled(isStandaloneDisplay())
+    setInstallPrompt(getInstallPrompt())
+    return subscribeInstallPrompt(setInstallPrompt)
   }, [])
 
-  if (isInstalled || (!installPrompt && !isIos)) return null
+  if (isInstalled) return null
 
   async function install() {
     if (installPrompt) {
@@ -41,18 +39,22 @@ export default function InstallAppButton() {
       setInstallPrompt(null)
       return
     }
-    toast('Dans Safari : touche Partager, puis « Sur l’écran d’accueil ».', { duration: 6000 })
+    if (isIos) {
+      toast('Sur iPhone : touche Partager, puis « Sur l’écran d’accueil ». Ouvre ensuite l’icône ShopSaaS.', { duration: 8000 })
+      return
+    }
+    toast('Ouvre ShopSaaS dans Chrome, puis menu ⋮ → « Installer l’application ».', { duration: 8000 })
   }
 
   return (
     <button
       type="button"
       onClick={install}
-      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-100 sm:gap-1.5 sm:px-2.5"
-      aria-label="Installer ShopSaaS sur ce téléphone"
+      className={className ?? 'inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-100 sm:gap-1.5 sm:px-2.5'}
+      aria-label="Installer l’application ShopSaaS"
     >
       <Download className="size-4" />
-      <span className="hidden sm:inline">Installer</span>
+      <span className="hidden sm:inline">{label}</span>
     </button>
   )
 }

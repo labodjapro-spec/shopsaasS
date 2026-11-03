@@ -1,13 +1,13 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Home, LogOut, Moon, Package, Palette, Settings, ShoppingBag, Sun, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Home, LogOut, Moon, Package, Palette, Settings, ShoppingBag, Smartphone, Sun, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import InstallAppButton from '@/app/InstallAppButton'
 
-const ICONS = { home: Home, orders: ShoppingBag, products: Package, team: Users, settings: Settings }
+const ICONS = { home: Home, orders: ShoppingBag, products: Package, team: Users, settings: Settings, app: Smartphone }
 const SIDEBAR_PRESETS = [
   { name: 'Violet clair', value: '#eeeaff' },
   { name: 'Bleu', value: '#2442b8' },
@@ -28,7 +28,7 @@ function readableForeground(hex: string) {
   return luminance > 0.179 ? '#211b38' : '#ffffff'
 }
 
-export type NavItem = { href: string; label: string; icon: keyof typeof ICONS }
+export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; desktopOnly?: boolean }
 
 export function Sidebar({
   items,
@@ -65,7 +65,7 @@ export function Sidebar({
       const appearance = JSON.parse(window.localStorage.getItem('shopsaas-dashboard-appearance') || '{}')
       if (appearance.mode === 'dark' || appearance.mode === 'light') setDashboardMode(appearance.mode)
       if (typeof appearance.sidebarColor === 'string' && /^#[0-9a-f]{6}$/i.test(appearance.sidebarColor)) setSidebarColor(appearance.sidebarColor)
-    } catch { /* garder les rÃƒÂ©glages par dÃƒÂ©faut */ }
+    } catch { /* garder les rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©glages par dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©faut */ }
     return () => {
       document.documentElement.classList.remove('dashboard-sidebar-collapsed')
       document.body.classList.remove('dashboard-dark')
@@ -98,16 +98,16 @@ export function Sidebar({
 
   const appearancePanel = appearanceOpen ? (
     <section
-      aria-label="Personnaliser lÃ¢â‚¬â„¢apparence"
+      aria-label="Personnaliser lÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢apparence"
       className="dashboard-appearance-panel fixed bottom-24 left-3 z-[60] w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border p-4 shadow-2xl md:bottom-4"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-bold">Apparence</h2>
-          <p className="mt-1 text-sm dashboard-muted">Change lÃ¢â‚¬â„¢ambiance de toute la barre.</p>
+          <p className="mt-1 text-sm dashboard-muted">Change lÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ambiance de toute la barre.</p>
         </div>
-        <button type="button" onClick={() => setAppearanceOpen(false)} className="rounded-lg px-2 py-1 text-sm dashboard-muted hover:bg-black/5" aria-label="Fermer les rÃƒÂ©glages">
-          Ã¢Å“â€¢
+        <button type="button" onClick={() => setAppearanceOpen(false)} className="rounded-lg px-2 py-1 text-sm dashboard-muted hover:bg-black/5" aria-label="Fermer les rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©glages">
+          ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢
         </button>
       </div>
 
@@ -132,7 +132,7 @@ export function Sidebar({
 
       <div className="mt-4">
         <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold">Couleur de la barre entiÃƒÂ¨re</p>
+          <p className="text-sm font-semibold">Couleur de la barre entiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re</p>
           <button
             type="button"
             onClick={() => setSidebarColor('')}
@@ -155,9 +155,9 @@ export function Sidebar({
             />
           ))}
           <label className="flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold">
-            <span>PersonnalisÃƒÂ©e</span>
+            <span>PersonnalisÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e</span>
             <input
-              aria-label="Choisir la couleur de toute la barre latÃƒÂ©rale"
+              aria-label="Choisir la couleur de toute la barre latÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rale"
               type="color"
               value={sidebarColor || (dashboardMode === 'dark' ? '#191a25' : '#ffffff')}
               onChange={event => setSidebarColor(event.target.value)}
@@ -182,8 +182,8 @@ export function Sidebar({
           <button
             type="button"
             onClick={toggleSidebar}
-            title={collapsed ? 'Ouvrir la barre latÃƒÂ©rale' : 'RÃƒÂ©duire la barre latÃƒÂ©rale'}
-            aria-label={collapsed ? 'Ouvrir la barre latÃƒÂ©rale' : 'RÃƒÂ©duire la barre latÃƒÂ©rale'}
+            title={collapsed ? 'Ouvrir la barre latÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rale' : 'RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©duire la barre latÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rale'}
+            aria-label={collapsed ? 'Ouvrir la barre latÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rale' : 'RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©duire la barre latÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rale'}
             className={`dashboard-sidebar-control absolute top-5 flex size-8 items-center justify-center rounded-lg border shadow-sm transition ${collapsed ? '-right-3' : 'right-3'}`}
           >
             {collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
@@ -232,21 +232,22 @@ export function Sidebar({
             </div>
           )}
           <div className={`flex ${collapsed ? 'flex-col' : 'items-center'} gap-2`}>
+            <InstallAppButton />
             <button
               type="button"
               onClick={() => setAppearanceOpen(open => !open)}
               aria-expanded={appearanceOpen}
               className="dashboard-sidebar-control flex min-h-11 flex-1 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition hover:bg-black/5"
-              title="Personnaliser lÃ¢â‚¬â„¢apparence"
+              title="Personnaliser lÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢apparence"
             >
               <Palette className="size-5 shrink-0" />
               {!collapsed && <span>Apparence</span>}
             </button>
             <form action={logoutAction}>
               <button
-                aria-label="Se dÃƒÂ©connecter"
+                aria-label="Se dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©connecter"
                 className="dashboard-sidebar-control flex size-11 items-center justify-center rounded-xl transition"
-                title="Se dÃƒÂ©connecter"
+                title="Se dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©connecter"
               >
                 <LogOut className="size-5" />
               </button>
@@ -259,12 +260,12 @@ export function Sidebar({
       <div className="dashboard-sidebar sticky top-0 z-30 border-b md:hidden">
         <header className="flex items-center justify-between gap-2 px-3 py-2.5">
           <div className="dashboard-store-switcher min-w-0 flex-1">{storeSwitcher}</div>
-          <button type="button" onClick={() => setAppearanceOpen(open => !open)} aria-label="Personnaliser lÃ¢â‚¬â„¢apparence" aria-expanded={appearanceOpen} className="dashboard-sidebar-control flex size-10 items-center justify-center rounded-xl border">
+          <button type="button" onClick={() => setAppearanceOpen(open => !open)} aria-label="Personnaliser lÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢apparence" aria-expanded={appearanceOpen} className="dashboard-sidebar-control flex size-10 items-center justify-center rounded-xl border">
             <Palette className="size-5" />
           </button>
           <InstallAppButton />
           <form action={logoutAction}>
-            <button aria-label="Se dÃƒÂ©connecter" className="dashboard-sidebar-control rounded-lg p-2" title="Se dÃƒÂ©connecter">
+            <button aria-label="Se dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©connecter" className="dashboard-sidebar-control rounded-lg p-2" title="Se dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©connecter">
               <LogOut className="size-5" />
             </button>
           </form>
@@ -275,7 +276,7 @@ export function Sidebar({
         className="dashboard-sidebar fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t px-1 pt-2 shadow-[0_-8px_24px_rgba(24,24,27,0.08)] backdrop-blur md:hidden"
         style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}
       >
-          {items.map((item) => {
+          {items.filter(item => !item.desktopOnly).map((item) => {
             const Icon = ICONS[item.icon]
             const active = isActive(item.href)
             return (

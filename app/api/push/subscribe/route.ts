@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+const MAX_DEVICES_PER_USER = 3
+
 function allowedPushEndpoint(value: unknown): value is string {
   if (typeof value !== 'string') return false
   try {
@@ -26,48 +28,70 @@ function hasOrderPermission(row: any) {
   return permissions.includes('*') || permissions.includes('orders.read')
 }
 
+async function userCanReadOrders(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data: memberships } = await supabase
+    .from('store_members')
+    .select('store_id, roles(permissions)')
+    .eq('user_id', userId)
+  return (memberships ?? []).some(hasOrderPermission)
+}
+
+async function pruneDevices(admin: ReturnType<typeof createAdminClient>, userId: string) {
+  const { data: rows } = await admin
+    .from('web_push_subscriptions')
+    .select('id')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+  const extraIds = (rows ?? []).slice(MAX_DEVICES_PER_USER).map((row: { id: string }) => row.id)
+  if (extraIds.length) await admin.from('web_push_subscriptions').delete().in('id', extraIds)
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
+    if (!(await userCanReadOrders(supabase, user.id))) {
+      return NextResponse.json({ error: 'Tu n’as pas accès aux commandes.' }, { status: 403 })
+    }
 
     const body = await request.json().catch(() => null)
-    const storeId = typeof body?.storeId === 'string' ? body.storeId : ''
     const subscription = body?.subscription
     const endpoint = subscription?.endpoint
     const p256dh = subscription?.keys?.p256dh
     const auth = subscription?.keys?.auth
-    if (!storeId || !allowedPushEndpoint(endpoint) || typeof p256dh !== 'string' || typeof auth !== 'string') {
+    const deviceId = typeof body?.deviceId === 'string' && body.deviceId.length <= 80 ? body.deviceId : null
+    const userAgent = typeof body?.userAgent === 'string' ? body.userAgent.slice(0, 300) : null
+    if (!allowedPushEndpoint(endpoint) || typeof p256dh !== 'string' || typeof auth !== 'string') {
       return NextResponse.json({ error: 'Abonnement push invalide.' }, { status: 400 })
     }
 
-    const { data: membership } = await supabase
-      .from('store_members')
-      .select('store_id, roles(permissions)')
-      .eq('store_id', storeId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-    if (!membership || !hasOrderPermission(membership)) {
-      return NextResponse.json({ error: 'Tu n’as pas accès aux commandes de cette boutique.' }, { status: 403 })
+    const admin = createAdminClient()
+    if (deviceId) {
+      await admin.from('web_push_subscriptions').delete().eq('user_id', user.id).eq('device_id', deviceId)
     }
 
-    const admin = createAdminClient()
-    const { error } = await admin
-      .from('web_push_subscriptions')
-      .upsert({
-        store_id: storeId,
-        user_id: user.id,
-        endpoint,
-        p256dh,
-        auth,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'store_id,user_id,endpoint' })
+    const payload = {
+      user_id: user.id,
+      endpoint,
+      p256dh,
+      auth,
+      device_id: deviceId,
+      user_agent: userAgent,
+      updated_at: new Date().toISOString(),
+    }
+    let { error } = await admin.from('web_push_subscriptions').upsert(payload, { onConflict: 'endpoint' })
+    if (error) {
+      await admin.from('web_push_subscriptions').delete().eq('user_id', user.id)
+      const inserted = await admin.from('web_push_subscriptions').insert(payload)
+      error = inserted.error
+    }
     if (error) {
       console.error('[push/subscribe] save failed:', error.message)
       return NextResponse.json({ error: 'Impossible d’enregistrer cet appareil.' }, { status: 500 })
     }
 
+    await pruneDevices(admin, user.id)
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('[push/subscribe] error:', error)
@@ -82,19 +106,17 @@ export async function DELETE(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
 
     const body = await request.json().catch(() => null)
-    const storeId = typeof body?.storeId === 'string' ? body.storeId : ''
     const endpoint = body?.endpoint
-    if (!storeId || !allowedPushEndpoint(endpoint)) {
+    const deviceId = typeof body?.deviceId === 'string' ? body.deviceId : ''
+    if (!allowedPushEndpoint(endpoint) && !deviceId) {
       return NextResponse.json({ error: 'Abonnement push invalide.' }, { status: 400 })
     }
 
     const admin = createAdminClient()
-    const { error } = await admin
-      .from('web_push_subscriptions')
-      .delete()
-      .eq('store_id', storeId)
-      .eq('user_id', user.id)
-      .eq('endpoint', endpoint)
+    let query = admin.from('web_push_subscriptions').delete().eq('user_id', user.id)
+    if (allowedPushEndpoint(endpoint)) query = query.eq('endpoint', endpoint)
+    else query = query.eq('device_id', deviceId)
+    const { error } = await query
     if (error) return NextResponse.json({ error: 'Impossible de retirer cet appareil.' }, { status: 500 })
 
     return NextResponse.json({ ok: true })

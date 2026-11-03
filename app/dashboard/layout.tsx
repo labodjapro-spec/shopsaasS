@@ -27,9 +27,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (can(permissions, 'orders.read')) {
     items.push({ href: '/dashboard/orders', label: 'Commandes', icon: 'orders' })
   }
+  items.push({ href: '/dashboard/app', label: 'Application', icon: 'app' })
   if (can(permissions, 'products.read')) items.push({ href: '/dashboard/products', label: 'Produits', icon: 'products' })
   if (can(permissions, 'pages.write')) items.push({ href: `/boutiques?parent=${store.id}`, label: 'Pages produits', icon: 'products' })
-  if (can(permissions, 'team.write')) items.push({ href: '/dashboard/team', label: 'Équipe', icon: 'team' })
+  // Équipe visible sur desktop uniquement — sur mobile elle est dans Réglages
+  if (can(permissions, 'team.write')) items.push({ href: '/dashboard/team', label: 'Équipe', icon: 'team', desktopOnly: true })
   if (can(permissions, 'settings.write')) items.push({ href: '/dashboard/settings', label: 'Réglages', icon: 'settings' })
 
   const userLabel = (user.user_metadata?.full_name as string | undefined) || user.email || 'Moi'
@@ -53,7 +55,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6 md:px-8 md:py-10">{children}</div>
       </main>
       {/* Notification son + toast pour les nouvelles commandes */}
-      {can(permissions, 'orders.read') && <OrderNotification storeId={store.id} />}
+      {can(permissions, 'orders.read') && (
+        <OrderNotification storeIds={(switcherStores.length ? switcherStores : [{ id: store.id }]).map(item => item.id)} />
+      )}
     </div>
   )
 }

@@ -4,6 +4,8 @@ import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import { ShoppingBag, Bell, Volume2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { isIosDevice, isStandaloneDisplay } from '@/lib/pwa/install'
+import { isPushFlagEnabled, removePushSubscription, savePushSubscription, setPushFlag } from '@/lib/push/browser'
 
 const ORDER_SOUND_PATH = '/sounds/shopify-order.mp3'
 let sharedAudioContext: AudioContext | null = null
@@ -16,7 +18,7 @@ function playFallbackOrderSound() {
     const ctx = sharedAudioContext
     if (ctx.state === 'suspended') void ctx.resume()
     const notes = [
-      { freq: 523.25, start: 0,    duration: 0.12 },
+      { freq: 523.25, start: 0, duration: 0.12 },
       { freq: 659.25, start: 0.13, duration: 0.12 },
       { freq: 783.99, start: 0.26, duration: 0.25 },
     ]
@@ -45,38 +47,6 @@ function playOrderSound(audio: HTMLAudioElement | null) {
   playFallbackOrderSound()
 }
 
-// ── Notification native du navigateur ───────────────────────────────────────
-async function requestNotifPermission() {
-  if (!('Notification' in window)) return false
-  if (Notification.permission === 'granted') return true
-  const perm = await Notification.requestPermission()
-  return perm === 'granted'
-}
-
-async function showBrowserNotif(title: string, body: string, url?: string, orderId?: string) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return
-  const options: NotificationOptions = {
-    body,
-    icon: '/icons/app-192.png',
-    badge: '/icons/app-192.png',
-    tag: orderId ? `order-${orderId}` : 'new-order',
-    data: { url: url || '/dashboard/orders' },
-    requireInteraction: true,
-  }
-  try {
-    if ('serviceWorker' in navigator) {
-      const registration = await navigator.serviceWorker.ready
-      await registration.showNotification(title, options)
-      return
-    }
-    const notification = new Notification(title, options)
-    if (url) notification.onclick = () => { window.focus(); window.location.href = url }
-  } catch (error) {
-    console.warn('[notifications] Browser notification unavailable:', error)
-  }
-}
-
-// ── Toast de commande ────────────────────────────────────────────────────────
 function showOrderToast(order: { id: string; order_number: string; customer_name: string; total: number; currency: string }) {
   toast.custom(
     (t) => (
@@ -125,18 +95,17 @@ function showOrderToast(order: { id: string; order_number: string; customer_name
         >×</button>
       </div>
     ),
-    { duration: 15000, position: 'top-right' },
+    { id: `order-toast-${order.id}`, duration: 15000, position: 'top-right' },
   )
 }
 
 interface OrderNotificationProps {
-  storeId: string
+  storeIds: string[]
 }
 
-export default function OrderNotification({ storeId }: OrderNotificationProps) {
+export default function OrderNotification({ storeIds }: OrderNotificationProps) {
   const supabase = useMemo(() => createClient(), [])
   const startedAt = useRef(new Date().toISOString())
-  // Persister les IDs connus en sessionStorage pour survivre aux rechargements
   const knownIds = useRef<Set<string>>(new Set(
     JSON.parse(typeof window !== 'undefined' ? (sessionStorage.getItem('shopsaas-known-orders') ?? '[]') : '[]')
   ))
@@ -146,8 +115,8 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
   const [pushBusy, setPushBusy] = useState(false)
   const [promptDismissed, setPromptDismissed] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const storeKey = storeIds.join(',')
 
-  // S'assurer qu'on est bien côté client avant d'accéder à window/Notification
   useEffect(() => {
     setMounted(true)
     setSoundEnabled(window.localStorage.getItem('shopsaas-order-sound-enabled') === 'true')
@@ -165,31 +134,41 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
 
   useEffect(() => {
     let active = true
-    setPushEnabled(window.localStorage.getItem(`shopsaas-push-enabled-${storeId}`) === 'true')
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      void navigator.serviceWorker.ready
-        .then(registration => registration.pushManager.getSubscription())
-        .then(subscription => {
-          if (active && !subscription) {
-            window.localStorage.setItem(`shopsaas-push-enabled-${storeId}`, 'false')
-            setPushEnabled(false)
-          }
-        })
-        .catch(() => {
-          if (active) {
-            window.localStorage.setItem(`shopsaas-push-enabled-${storeId}`, 'false')
-            setPushEnabled(false)
-          }
-        })
-    } else {
+    setPushEnabled(isPushFlagEnabled())
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
       setPushEnabled(false)
+      return
     }
+    void (async () => {
+      try {
+        const registration = await navigator.serviceWorker.ready
+        const subscription = await registration.pushManager.getSubscription()
+        if (!active) return
+        if (Notification.permission === 'granted' && isPushFlagEnabled()) {
+          await savePushSubscription()
+          if (active) setPushEnabled(true)
+          return
+        }
+        if (!subscription) {
+          setPushFlag(false)
+          setPushEnabled(false)
+        }
+      } catch {
+        if (active) setPushEnabled(false)
+      }
+    })()
     return () => { active = false }
-  }, [storeId])
+  }, [])
 
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const rememberOrder = useCallback((id: string) => {
+    if (knownIds.current.has(id)) return false
+    knownIds.current.add(id)
+    try {
+      sessionStorage.setItem('shopsaas-known-orders', JSON.stringify(Array.from(knownIds.current).slice(-100)))
+    } catch { /* silencieux */ }
+    return true
+  }, [])
 
-  // ── Traiter une nouvelle commande ─────────────────────────────────────────
   const handleNewOrder = useCallback((order: {
     id: string
     order_number: string
@@ -197,116 +176,83 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
     total: number
     currency: string
   }) => {
-    if (knownIds.current.has(order.id)) return
-    knownIds.current.add(order.id)
-    // Persister pour éviter les doublons après rechargement de page
-    try {
-      const arr = Array.from(knownIds.current).slice(-100)
-      sessionStorage.setItem('shopsaas-known-orders', JSON.stringify(arr))
-    } catch { /* silencieux */ }
-
+    if (!rememberOrder(order.id)) return
     if (soundEnabled) playOrderSound(audioRef.current)
     showOrderToast(order)
-    void showBrowserNotif(
-      `Nouvelle commande ${order.order_number}`,
-      `${order.customer_name} · ${order.total.toLocaleString('fr-FR')} ${order.currency}`,
-      `/dashboard/orders/${order.id}`,
-      order.id,
-    )
-  }, [soundEnabled])
+  }, [rememberOrder, soundEnabled])
 
-  // ── Supabase Realtime — toast + son quand dashboard ouvert ──────────────
-  // La Edge Function Supabase gère déjà les push quand l'app est fermée.
-  // Ici on gère seulement le toast/son (pas de notification push navigateur).
   useEffect(() => {
-    const channel = supabase
-      .channel(`orders:${storeId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'orders',
-          filter: `store_id=eq.${storeId}`,
-        },
-        async (payload) => {
-          const o = payload.new as any
-          if (knownIds.current.has(o.id)) return
-          knownIds.current.add(o.id)
-          try {
-            const arr = Array.from(knownIds.current).slice(-100)
-            sessionStorage.setItem('shopsaas-known-orders', JSON.stringify(arr))
-          } catch { /* silencieux */ }
+    const channels = storeIds.map((storeId) =>
+      supabase
+        .channel(`orders:${storeId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` },
+          async (payload) => {
+            const o = payload.new as any
+            if (knownIds.current.has(o.id)) return
+            const { data: market } = o.market_id
+              ? await supabase.from('markets').select('currency').eq('id', o.market_id).maybeSingle()
+              : { data: null }
+            handleNewOrder({
+              id: o.id,
+              order_number: o.order_number ?? `#${String(o.id).slice(0, 6).toUpperCase()}`,
+              customer_name: o.customer_name ?? 'Client',
+              total: Number(o.total) || 0,
+              currency: market?.currency ?? 'XOF',
+            })
+          },
+        )
+        .subscribe()
+    )
+    return () => { channels.forEach((channel) => { supabase.removeChannel(channel) }) }
+  }, [handleNewOrder, storeKey, storeIds, supabase])
 
-          const { data: market } = o.market_id
-            ? await supabase.from('markets').select('currency').eq('id', o.market_id).maybeSingle()
-            : { data: null }
+  useEffect(() => {
+    if (!storeIds.length) return
+    const poll = async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const response = await fetch(`/api/orders/poll?store_ids=${encodeURIComponent(storeIds.join(','))}&since=${encodeURIComponent(startedAt.current)}`)
+        const data = await response.json().catch(() => ({ orders: [] }))
+        for (const order of data.orders ?? []) handleNewOrder(order)
+      } catch { /* silencieux */ }
+    }
+    const timer = window.setInterval(poll, 20000)
+    const onVisible = () => { if (document.visibilityState === 'visible') void poll() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [handleNewOrder, storeKey, storeIds])
 
-          const order = {
-            id: o.id,
-            order_number: o.order_number ?? `#${o.id.slice(0, 6).toUpperCase()}`,
-            customer_name: o.customer_name ?? 'Client',
-            total: Number(o.total) || 0,
-            currency: market?.currency ?? 'XOF',
-          }
-
-          // Son + toast uniquement (pas de push navigateur — la Edge Function s'en charge)
-          if (soundEnabled) playOrderSound(audioRef.current)
-          showOrderToast(order)
-        },
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [storeId, soundEnabled, supabase])
-
-  function urlBase64ToUint8Array(base64String: string) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4)
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-    const raw = window.atob(base64)
-    return Uint8Array.from(raw, char => char.charCodeAt(0))
-  }
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data
+      if (data?.type !== 'ORDER_PUSH') return
+      const orderId = data.orderId || String(data.tag || '').replace(/^order-/, '')
+      handleNewOrder({
+        id: orderId || `push-${Date.now()}`,
+        order_number: String(data.body || 'Nouvelle commande').split(' · ')[0] || 'Commande',
+        customer_name: 'Client',
+        total: 0,
+        currency: '',
+      })
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [handleNewOrder])
 
   const enablePush = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-      toast.error('Ce navigateur ne prend pas en charge les notifications Push.')
+    if (isIosDevice() && !isStandaloneDisplay()) {
+      toast('Sur iPhone/iPad, installe d’abord ShopSaaS sur l’écran d’accueil, puis ouvre l’icône pour activer les alertes.', { duration: 7000 })
       return
     }
-    const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-    const isInstalled = window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as Navigator & { standalone?: boolean }).standalone === true
-    if (isIos && !isInstalled) {
-      toast('Sur iPhone/iPad, ajoute d’abord ShopSaaS à l’écran d’accueil, puis ouvre l’icône pour activer Push.', { duration: 7000 })
-      return
-    }
-    const applicationServerKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-    if (!applicationServerKey) {
-      toast.error('La clé VAPID publique n’est pas configurée dans l’application.')
-      return
-    }
-
     setPushBusy(true)
     try {
-      const ok = await requestNotifPermission()
-      if (!ok) {
-        toast.error('Autorise les notifications dans les réglages du navigateur.')
-        return
-      }
-      const registration = await navigator.serviceWorker.ready
-      const subscription = await registration.pushManager.getSubscription() ??
-        await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(applicationServerKey) as BufferSource,
-        })
-      const response = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId, subscription: subscription.toJSON() }),
-      })
-      const result = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(result.error || 'Impossible d’enregistrer cet appareil.')
-      window.localStorage.setItem(`shopsaas-push-enabled-${storeId}`, 'true')
+      await savePushSubscription()
       setPushEnabled(true)
       toast.success('Les notifications de commandes sont activées sur cet appareil.')
     } catch (error: any) {
@@ -326,17 +272,7 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
   const disablePush = async () => {
     setPushBusy(true)
     try {
-      const registration = await navigator.serviceWorker.ready
-      const subscription = await registration.pushManager.getSubscription()
-      if (subscription) {
-        const response = await fetch('/api/push/subscribe', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ storeId, endpoint: subscription.endpoint }),
-        })
-        if (!response.ok) throw new Error('Impossible de retirer cet appareil de cette boutique.')
-      }
-      window.localStorage.setItem(`shopsaas-push-enabled-${storeId}`, 'false')
+      await removePushSubscription()
       setPushEnabled(false)
       toast.success('Les alertes Push sont désactivées sur cet appareil.')
     } catch {
@@ -346,23 +282,23 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
     }
   }
 
-  // ── Bandeau d'activation simplifié ─────────────────────────────────────
   if (mounted && !promptDismissed && (!soundEnabled || !pushEnabled)) {
     return (
-      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-2rem)] max-w-sm">
+      <div className="fixed bottom-20 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 md:bottom-6">
         <div className="flex items-center justify-between gap-3 rounded-2xl bg-zinc-900 px-4 py-3 text-white shadow-2xl">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex min-w-0 items-center gap-2.5">
             <Bell className="size-5 shrink-0 text-violet-400" />
             <p className="text-sm font-medium leading-tight">
               {!soundEnabled ? 'Activer le son des commandes' : 'Activer les alertes commandes'}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
             {!soundEnabled && (
               <button
                 onClick={enableSound}
-                className="rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-violet-700"
+                className="inline-flex items-center gap-1 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-violet-700"
               >
+                <Volume2 className="size-3.5" />
                 Son
               </button>
             )}
@@ -375,9 +311,12 @@ export default function OrderNotification({ storeId }: OrderNotificationProps) {
                 {pushBusy ? '…' : 'Push'}
               </button>
             )}
+            {pushEnabled && (
+              <button onClick={disablePush} className="text-xs text-zinc-400 hover:text-white">Off</button>
+            )}
             <button
               onClick={() => setPromptDismissed(true)}
-              className="text-xs text-zinc-400 hover:text-white px-1"
+              className="px-1 text-xs text-zinc-400 hover:text-white"
             >
               ✕
             </button>

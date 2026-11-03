@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
 import PWARegister from './PWARegister'
@@ -20,6 +20,13 @@ export const metadata: Metadata = {
     icon: '/icons/app-192.png',
     apple: '/icons/app-apple.png',
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#6d28d9',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

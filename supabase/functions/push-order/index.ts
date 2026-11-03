@@ -7,6 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+const MAX_DEVICES_PER_USER = 3
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
   if (request.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405, headers: corsHeaders })
@@ -34,13 +36,23 @@ Deno.serve(async (request) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
-  const [{ data: order, error: orderError }, { data: members, error: memberError }] = await Promise.all([
+
+  const { error: dispatchError } = await supabase
+    .from('order_push_dispatches')
+    .insert({ order_id: orderId })
+  if (dispatchError) {
+    if (dispatchError.code === '23505') return Response.json({ sent: 0, skipped: true }, { headers: corsHeaders })
+    console.warn('[push-order] dispatch lock failed:', dispatchError.message)
+  }
+
+  const [{ data: order, error: orderError }, { data: store }, { data: members, error: memberError }] = await Promise.all([
     supabase
       .from('orders')
       .select('id, store_id, order_number, total, markets(currency)')
       .eq('id', orderId)
       .eq('store_id', storeId)
       .maybeSingle(),
+    supabase.from('stores').select('name').eq('id', storeId).maybeSingle(),
     supabase
       .from('store_members')
       .select('user_id, roles(permissions)')
@@ -59,13 +71,23 @@ Deno.serve(async (request) => {
 
   const { data: subscriptions, error: subscriptionError } = await supabase
     .from('web_push_subscriptions')
-    .select('id, endpoint, p256dh, auth')
-    .eq('store_id', storeId)
+    .select('id, user_id, endpoint, p256dh, auth, updated_at')
     .in('user_id', eligibleUserIds)
+    .order('updated_at', { ascending: false })
   if (subscriptionError) {
     return Response.json({ error: 'Could not load push subscriptions.' }, { status: 500, headers: corsHeaders })
   }
   if (!subscriptions?.length) return Response.json({ sent: 0 }, { headers: corsHeaders })
+
+  const perUserCount = new Map<string, number>()
+  const unique = new Map<string, (typeof subscriptions)[number]>()
+  for (const row of subscriptions) {
+    const already = perUserCount.get(row.user_id) ?? 0
+    if (already >= MAX_DEVICES_PER_USER) continue
+    if (unique.has(row.endpoint)) continue
+    unique.set(row.endpoint, row)
+    perUserCount.set(row.user_id, already + 1)
+  }
 
   let vapidKeys: webpush.ExportedVapidKeys
   try {
@@ -80,16 +102,18 @@ Deno.serve(async (request) => {
   })
   const currency = String((order.markets as any)?.currency ?? '')
   const total = Number(order.total) || 0
+  const storeName = String(store?.name ?? 'Boutique')
   const payload = JSON.stringify({
-    title: 'Nouvelle commande',
-    body: `${order.order_number} · ${total.toLocaleString('fr-FR')} ${currency}`,
+    title: `Nouvelle commande · ${storeName}`,
+    body: `${order.order_number} · ${total.toLocaleString('fr-FR')} ${currency}`.trim(),
     url: `/dashboard/orders/${order.id}`,
     tag: `order-${order.id}`,
+    orderId: order.id,
   })
 
   let sent = 0
   const expiredIds: string[] = []
-  await Promise.all((subscriptions ?? []).map(async (row: any) => {
+  await Promise.all([...unique.values()].map(async (row) => {
     try {
       const subscriber = applicationServer.subscribe({
         endpoint: row.endpoint,
