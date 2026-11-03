@@ -144,7 +144,7 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
         const registration = await navigator.serviceWorker.ready
         const subscription = await registration.pushManager.getSubscription()
         if (!active) return
-        if (Notification.permission === 'granted' && isPushFlagEnabled()) {
+        if (Notification.permission === 'granted' && (subscription || isPushFlagEnabled())) {
           await savePushSubscription()
           if (active) setPushEnabled(true)
           return
@@ -154,6 +154,7 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
           setPushEnabled(false)
         }
       } catch {
+        setPushFlag(false)
         if (active) setPushEnabled(false)
       }
     })()

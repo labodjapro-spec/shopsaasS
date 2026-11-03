@@ -28,11 +28,23 @@ function hasOrderPermission(row: any) {
   return permissions.includes('*') || permissions.includes('orders.read')
 }
 
-async function userCanReadOrders(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data: memberships } = await supabase
-    .from('store_members')
-    .select('store_id, roles(permissions)')
-    .eq('user_id', userId)
+async function userCanReadOrders(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+) {
+  const [{ data: memberships }, { data: ownedStores }] = await Promise.all([
+    supabase
+      .from('store_members')
+      .select('store_id, roles(permissions)')
+      .eq('user_id', userId),
+    admin
+      .from('stores')
+      .select('id')
+      .eq('owner_id', userId)
+      .limit(1),
+  ])
+  if ((ownedStores ?? []).length > 0) return true
   return (memberships ?? []).some(hasOrderPermission)
 }
 
@@ -51,22 +63,23 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
-    if (!(await userCanReadOrders(supabase, user.id))) {
+
+    const admin = createAdminClient()
+    if (!(await userCanReadOrders(supabase, admin, user.id))) {
       return NextResponse.json({ error: 'Tu n’as pas accès aux commandes.' }, { status: 403 })
     }
 
     const body = await request.json().catch(() => null)
     const subscription = body?.subscription
-    const endpoint = subscription?.endpoint
-    const p256dh = subscription?.keys?.p256dh
-    const auth = subscription?.keys?.auth
-    const deviceId = typeof body?.deviceId === 'string' && body.deviceId.length <= 80 ? body.deviceId : null
+    const endpoint = typeof subscription?.endpoint === 'string' ? subscription.endpoint.trim() : ''
+    const p256dh = typeof subscription?.keys?.p256dh === 'string' ? subscription.keys.p256dh.trim() : ''
+    const auth = typeof subscription?.keys?.auth === 'string' ? subscription.keys.auth.trim() : ''
+    const deviceId = typeof body?.deviceId === 'string' && body.deviceId.length <= 80 ? body.deviceId.trim() : null
     const userAgent = typeof body?.userAgent === 'string' ? body.userAgent.slice(0, 300) : null
-    if (!allowedPushEndpoint(endpoint) || typeof p256dh !== 'string' || typeof auth !== 'string') {
+    if (!allowedPushEndpoint(endpoint) || !p256dh || !auth) {
       return NextResponse.json({ error: 'Abonnement push invalide.' }, { status: 400 })
     }
 
-    const admin = createAdminClient()
     if (deviceId) {
       await admin.from('web_push_subscriptions').delete().eq('user_id', user.id).eq('device_id', deviceId)
     }
@@ -106,8 +119,8 @@ export async function DELETE(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
 
     const body = await request.json().catch(() => null)
-    const endpoint = body?.endpoint
-    const deviceId = typeof body?.deviceId === 'string' ? body.deviceId : ''
+    const endpoint = typeof body?.endpoint === 'string' ? body.endpoint.trim() : ''
+    const deviceId = typeof body?.deviceId === 'string' ? body.deviceId.trim() : ''
     if (!allowedPushEndpoint(endpoint) && !deviceId) {
       return NextResponse.json({ error: 'Abonnement push invalide.' }, { status: 400 })
     }

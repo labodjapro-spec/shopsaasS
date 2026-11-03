@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { Bell, CheckCircle2, Download, Smartphone, Stethoscope, XCircle } from 'lucide-react'
 import InstallAppButton from '@/app/InstallAppButton'
 import { isIosDevice, isStandaloneDisplay, subscribeInstallPrompt } from '@/lib/pwa/install'
-import { isPushFlagEnabled, removePushSubscription, runPushDiagnostic, savePushSubscription, type PushCheck } from '@/lib/push/browser'
+import { isPushFlagEnabled, removePushSubscription, runPushDiagnostic, savePushSubscription, setPushFlag, type PushCheck } from '@/lib/push/browser'
 
 export default function AppSetup() {
   const [installed, setInstalled] = useState(false)
@@ -23,8 +23,12 @@ export default function AppSetup() {
     try {
       const result = await runPushDiagnostic()
       setDiagnostic(result)
-      if (result.ok) toast.success('Notification test envoyée. Elle doit apparaître dans quelques secondes.')
-      else toast.error('Un réglage bloque les notifications. Regarde la liste.')
+      if (result.ok) {
+        setPushEnabled(true)
+        toast.success('Notification test envoyée. Elle doit apparaître dans quelques secondes.')
+      } else {
+        toast.error('Un réglage bloque les notifications. Regarde la liste.')
+      }
     } catch (error: any) {
       toast.error(error?.message || 'Le test a échoué.')
     } finally {
@@ -33,11 +37,37 @@ export default function AppSetup() {
   }
 
   useEffect(() => {
+    let active = true
     setInstalled(isStandaloneDisplay())
     setIos(isIosDevice())
     setPushEnabled(isPushFlagEnabled())
     setPermission(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission)
-    return subscribeInstallPrompt((event) => setCanPrompt(Boolean(event)))
+    const unsub = subscribeInstallPrompt((event) => setCanPrompt(Boolean(event)))
+
+    if ('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window) {
+      void (async () => {
+        try {
+          const registration = await navigator.serviceWorker.ready
+          const sub = await registration.pushManager.getSubscription()
+          if (!active) return
+          if (Notification.permission === 'granted' && (sub || isPushFlagEnabled())) {
+            await savePushSubscription()
+            if (active) setPushEnabled(true)
+          } else if (!sub) {
+            setPushFlag(false)
+            if (active) setPushEnabled(false)
+          }
+        } catch {
+          setPushFlag(false)
+          if (active) setPushEnabled(false)
+        }
+      })()
+    }
+
+    return () => {
+      active = false
+      unsub()
+    }
   }, [])
 
   async function enablePush() {

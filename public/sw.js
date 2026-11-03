@@ -1,4 +1,4 @@
-/* ShopSaaS merchant app — v6 */
+/* ShopSaaS merchant app — v7 */
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
 })
@@ -7,13 +7,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
 })
 
-self.addEventListener('fetch', (event) => {
-  const request = event.request
-  if (request.method !== 'GET') return
-  const url = new URL(request.url)
-  if (url.origin !== self.location.origin) return
-  if (url.pathname === '/sw.js' || url.pathname === '/manifest.webmanifest') return
-  event.respondWith(fetch(request))
+self.addEventListener('fetch', () => {
+  // Keep a fetch listener so Chrome treats ShopSaaS as an installable PWA,
+  // while letting the browser handle network requests natively.
 })
 
 function isMerchantClient(client) {
@@ -38,7 +34,7 @@ async function handlePush(event) {
   }
 
   const title = payload.title || 'Nouvelle commande'
-  const tag = payload.tag || 'shopsaas-new-order'
+  const tag = payload.tag || `shopsaas-order-${Date.now()}`
   const url = payload.url || '/dashboard/orders'
   const body = payload.body || 'Ouvre ShopSaaS pour consulter la commande.'
   const message = {
@@ -57,15 +53,13 @@ async function handlePush(event) {
   }
 
   const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  const focusedMerchant = windows.find((client) => client.focused && isMerchantClient(client))
-  // A test push must always show a real system notification.
-  if (focusedMerchant && !payload.test) {
-    focusedMerchant.postMessage(message)
-    return
+  if (!payload.test) {
+    windows.filter(isMerchantClient).forEach((client) => client.postMessage(message))
   }
 
-  if (!payload.test) windows.filter(isMerchantClient).forEach((client) => client.postMessage(message))
-
+  // Always display the system notification: on Android/Windows, a tab can still
+  // report focused=true when the phone screen just locked or another window is
+  // in front. Skipping showNotification() caused missed alerts.
   await self.registration.showNotification(title, {
     body,
     icon: '/icons/app-192.png',

@@ -3,8 +3,8 @@
  * Secrets remain server-side; push failure never rolls back a real order.
  */
 export async function dispatchOrderPush(storeId: string, orderId: string) {
-  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const hookSecret = process.env.PUSH_HOOK_SECRET
+  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/+$/, '')
+  const hookSecret = process.env.PUSH_HOOK_SECRET?.trim()
   if (!projectUrl || !hookSecret) {
     console.warn('[push] skipped: NEXT_PUBLIC_SUPABASE_URL or PUSH_HOOK_SECRET is missing on the server')
     return

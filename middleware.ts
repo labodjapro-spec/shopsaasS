@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
-const ROOT = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000').toLowerCase()
+const ROOT = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000').trim().toLowerCase()
 const APP_SUBDOMAINS = new Set(['app', 'www'])
 
 /** maboutique.notresaas.com -> "maboutique" ; app.notresaas.com / notresaas.com / *.vercel.app -> null */
@@ -19,7 +19,7 @@ export async function middleware(request: NextRequest) {
   const sub = storeSubdomain(host)
 
   // Vitrine : maboutique.notresaas.com/p/mon-produit -> /s/maboutique/p/mon-produit
-  if (sub) {
+  if (sub && !request.nextUrl.pathname.startsWith('/api/')) {
     const { pathname, search } = request.nextUrl
     const target = new URL(`/s/${sub}${pathname === '/' ? '' : pathname}${search}`, request.url)
     const headers = new Headers(request.headers)

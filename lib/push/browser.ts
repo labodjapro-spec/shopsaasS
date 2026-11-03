@@ -19,8 +19,9 @@ export function setPushFlag(enabled: boolean) {
 }
 
 function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4)
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const cleaned = base64String.trim()
+  const padding = '='.repeat((4 - cleaned.length % 4) % 4)
+  const base64 = (cleaned + padding).replace(/-/g, '+').replace(/_/g, '/')
   const raw = window.atob(base64)
   return Uint8Array.from(raw, (char) => char.charCodeAt(0))
 }
@@ -43,15 +44,16 @@ export function subscriptionKey(subscription: PushSubscription | null) {
  * with an old key is silently rejected (403) by Google/Apple, so we replace it.
  */
 async function getFreshSubscription(registration: ServiceWorkerRegistration, applicationServerKey: string) {
+  const cleanKey = applicationServerKey.trim()
   const existing = await registration.pushManager.getSubscription()
   if (existing) {
     const key = subscriptionKey(existing)
-    if (!key || key === applicationServerKey) return existing
+    if (!key || key === cleanKey) return existing
     await existing.unsubscribe().catch(() => undefined)
   }
   return registration.pushManager.subscribe({
     userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(applicationServerKey) as BufferSource,
+    applicationServerKey: urlBase64ToUint8Array(cleanKey) as BufferSource,
   })
 }
 
@@ -59,7 +61,7 @@ export async function savePushSubscription() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     throw new Error('Ce navigateur ne prend pas en charge les notifications Push.')
   }
-  const applicationServerKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  const applicationServerKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim()
   if (!applicationServerKey) {
     throw new Error('La clé VAPID publique n’est pas configurée.')
   }
@@ -135,7 +137,16 @@ export async function runPushDiagnostic(): Promise<{ ok: boolean; checks: PushCh
     detail: registration?.active ? 'Oui' : 'Non enregistré',
     fix: 'Recharge la page une fois.',
   })
-  const subscription = registration ? await registration.pushManager.getSubscription() : null
+
+  // If permission is already granted, ensure the subscription is fresh and saved before testing
+  let subscription = registration ? await registration.pushManager.getSubscription() : null
+  if (permission === 'granted' && registration?.active) {
+    try {
+      subscription = await savePushSubscription()
+    } catch {
+      // Diagnostic will report the exact issue below
+    }
+  }
 
   const response = await fetch('/api/push/test', {
     method: 'POST',

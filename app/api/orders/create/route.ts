@@ -5,11 +5,11 @@ import { dispatchOrderPush } from '@/lib/push/dispatch-order-push'
 import { sendMetaPurchase } from '@/lib/meta/conversions-api'
 import { markAbandonedCartConverted } from '@/lib/abandoned-cart/server'
 
-const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'
+const ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000').trim()
 
 function corsHeaders(req: NextRequest) {
   const origin = req.headers.get('origin') ?? ''
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'
+  const rootDomain = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000').trim()
   const isLocal = rootDomain.startsWith('localhost')
 
   const allowed =

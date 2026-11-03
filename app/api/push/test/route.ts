@@ -6,10 +6,77 @@ import { createAdminClient } from '@/lib/supabase/admin'
  * Push diagnostic. Checks every link of the chain, then sends a real test
  * notification to the signed-in user's devices:
  *   Vercel env vars → Supabase table → Edge Function + secrets → push service.
- * Never returns secret values, only whether they are present and consistent.
+ * Also works if the Supabase Edge Function is still on v1 (before redeploying v2).
  */
 
 type Check = { id: string; label: string; ok: boolean; detail?: string; fix?: string }
+
+async function sendTestViaLegacyFunction(
+  admin: ReturnType<typeof createAdminClient>,
+  projectUrl: string,
+  hookSecret: string,
+  userId: string,
+) {
+  // Find a store + market where this user is a member or owner so v1 can send a test push
+  const { data: member } = await admin
+    .from('store_members')
+    .select('store_id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle()
+
+  let storeId = member?.store_id as string | undefined
+  if (!storeId) {
+    const { data: owned } = await admin.from('stores').select('id').eq('owner_id', userId).limit(1).maybeSingle()
+    storeId = owned?.id
+  }
+  if (!storeId) return { ok: false, reason: 'Aucune boutique trouvée pour ce compte.' }
+
+  const { data: market } = await admin
+    .from('markets')
+    .select('id')
+    .eq('store_id', storeId)
+    .limit(1)
+    .maybeSingle()
+  if (!market?.id) return { ok: false, reason: 'Aucun marché trouvé pour cette boutique.' }
+
+  // Insert a temporary order row, call push-order v1, then delete the temporary row immediately
+  const { data: tempOrder, error: insertError } = await admin
+    .from('orders')
+    .insert({
+      store_id: storeId,
+      market_id: market.id,
+      order_number: 'TEST-PUSH',
+      customer_name: 'Test Notification ✅',
+      customer_phone: '+00000000',
+      customer_city: 'Test',
+      customer_address: 'Test',
+      subtotal: 0,
+      shipping_fee: 0,
+      total: 0,
+    })
+    .select('id')
+    .single()
+
+  if (insertError || !tempOrder?.id) {
+    return { ok: false, reason: insertError?.message || 'Impossible de préparer le test v1.' }
+  }
+
+  try {
+    const res = await fetch(`${projectUrl}/functions/v1/push-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-push-hook-secret': hookSecret },
+      body: JSON.stringify({ storeId, orderId: tempOrder.id }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(20000),
+    })
+    const data = await res.json().catch(() => ({} as any))
+    return { ok: res.ok, status: res.status, sent: Number(data?.sent) || 0, expired: Number(data?.expired) || 0, error: data?.error }
+  } finally {
+    await admin.from('order_push_dispatches').delete().eq('order_id', tempOrder.id)
+    await admin.from('orders').delete().eq('id', tempOrder.id)
+  }
+}
 
 export async function POST(request: NextRequest) {
   const checks: Check[] = []
@@ -22,14 +89,14 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
 
   const body = await request.json().catch(() => ({}))
-  const browserEndpoint = typeof body?.endpoint === 'string' ? body.endpoint : ''
-  const browserKey = typeof body?.applicationServerKey === 'string' ? body.applicationServerKey : ''
+  const browserEndpoint = typeof body?.endpoint === 'string' ? body.endpoint.trim() : ''
+  const browserKey = typeof body?.applicationServerKey === 'string' ? body.applicationServerKey.trim() : ''
 
   // 1. Vercel environment variables
-  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-  const hookSecret = process.env.PUSH_HOOK_SECRET
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/+$/, '')
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim()
+  const hookSecret = process.env.PUSH_HOOK_SECRET?.trim()
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   const missingEnv = [
     !publicKey && 'NEXT_PUBLIC_VAPID_PUBLIC_KEY',
     !hookSecret && 'PUSH_HOOK_SECRET',
@@ -131,34 +198,56 @@ export async function POST(request: NextRequest) {
       fix: 'Supabase → Edge Functions → push-order → Details : désactive « Verify JWT », enregistre.' })
     return done()
   }
-  if (!result?.version) {
-    add({ id: 'function', label: 'Fonction Supabase push-order', ok: false,
-      detail: `Ancienne version de la fonction (réponse ${response.status})`,
-      fix: 'Recopie supabase/functions/push-order/index.ts dans l’éditeur Supabase et redéploie.' })
-    return done()
-  }
-  add({ id: 'function', label: 'Fonction Supabase push-order', ok: true, detail: `Déployée (${result.version})` })
 
-  if (result?.code === 'bad_hook_secret' || result?.code === 'missing_hook_secret') {
+  if (response.status === 401 || result?.code === 'bad_hook_secret' || result?.code === 'missing_hook_secret') {
     add({ id: 'secret', label: 'Secret partagé Vercel ↔ Supabase', ok: false,
-      detail: result.code === 'missing_hook_secret' ? 'PUSH_HOOK_SECRET absent des secrets Supabase' : 'PUSH_HOOK_SECRET différent entre Vercel et Supabase',
+      detail: result?.code === 'missing_hook_secret' ? 'PUSH_HOOK_SECRET absent des secrets Supabase' : 'PUSH_HOOK_SECRET différent entre Vercel et Supabase',
       fix: 'Mets exactement la même valeur PUSH_HOOK_SECRET dans Vercel et dans Supabase → Edge Functions → Secrets.' })
     return done()
   }
-  add({ id: 'secret', label: 'Secret partagé Vercel ↔ Supabase', ok: true, detail: 'Identique' })
 
-  if (result?.code === 'missing_vapid_secrets' || result?.code === 'invalid_vapid_json') {
+  if (result?.code === 'missing_vapid_secrets' || result?.code === 'invalid_vapid_json' || result?.error === 'Push function secrets are not configured.') {
     add({ id: 'vapid', label: 'Clés VAPID dans Supabase', ok: false,
-      detail: result.code === 'invalid_vapid_json' ? 'VAPID_KEYS_JSON mal copié' : `Manquant : ${(result.missing ?? []).join(', ')}`,
+      detail: result?.code === 'invalid_vapid_json' ? 'VAPID_KEYS_JSON mal copié' : 'VAPID_KEYS_JSON ou VAPID_SUBJECT manquant dans Supabase',
       fix: 'Supabase → Edge Functions → Secrets : recopie VAPID_KEYS_JSON et VAPID_SUBJECT depuis PUSH-VALUES.txt.' })
     return done()
   }
+
+  // Fallback for push-order v1 (before the user updates the function code in Supabase)
+  if (!result?.version && response.status === 400 && result?.error === 'storeId and orderId are required.') {
+    add({ id: 'function', label: 'Fonction Supabase push-order', ok: true, detail: 'Déployée (v1 active — pense à mettre v2 quand tu seras sur PC)' })
+    add({ id: 'secret', label: 'Secret partagé Vercel ↔ Supabase', ok: true, detail: 'Identique' })
+    const legacy = await sendTestViaLegacyFunction(admin, projectUrl!, hookSecret!, user.id)
+    add({
+      id: 'send',
+      label: 'Envoi de la notification test',
+      ok: Boolean(legacy.ok && (legacy.sent ?? 0) > 0),
+      detail: legacy.ok
+        ? ((legacy.sent ?? 0) > 0
+            ? `${legacy.sent} appareil(s) notifié(s) avec succès`
+            : `0 appareil notifié (${legacy.expired ? 'abonnement expiré ou clé VAPID différente' : 'aucun appareil accepté'})`)
+        : (legacy.reason || legacy.error || 'Échec du test'),
+      fix: 'Désactive puis réactive les alertes sur cet appareil, et vérifie que VAPID_KEYS_JSON dans Supabase correspond à NEXT_PUBLIC_VAPID_PUBLIC_KEY sur Vercel.',
+    })
+    return done()
+  }
+
+  if (!result?.version) {
+    add({ id: 'function', label: 'Fonction Supabase push-order', ok: false,
+      detail: `Réponse inattendue (${response.status}) : ${result?.error || 'inconnue'}`,
+      fix: 'Recopie supabase/functions/push-order/index.ts dans l’éditeur Supabase et redéploie.' })
+    return done()
+  }
+
+  add({ id: 'function', label: 'Fonction Supabase push-order', ok: true, detail: `Déployée (${result.version})` })
+  add({ id: 'secret', label: 'Secret partagé Vercel ↔ Supabase', ok: true, detail: 'Identique' })
+
   if (!response.ok) {
     add({ id: 'vapid', label: 'Fonction Supabase', ok: false, detail: result?.error || `Erreur ${response.status}`, fix: 'Ouvre Supabase → Edge Functions → push-order → Logs.' })
     return done()
   }
 
-  const keysMatch = result.vapidPublicKey === publicKey
+  const keysMatch = String(result.vapidPublicKey || '').trim() === publicKey
   add({
     id: 'vapid',
     label: 'Clés VAPID Vercel = Supabase',

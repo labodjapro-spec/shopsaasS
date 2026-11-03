@@ -102,16 +102,17 @@ Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  const expectedSecret = Deno.env.get('PUSH_HOOK_SECRET')
+  const expectedSecret = Deno.env.get('PUSH_HOOK_SECRET')?.trim()
+  const receivedSecret = request.headers.get('x-push-hook-secret')?.trim()
   if (!expectedSecret) return json({ error: 'PUSH_HOOK_SECRET missing in Supabase secrets.', code: 'missing_hook_secret' }, 500)
-  if (request.headers.get('x-push-hook-secret') !== expectedSecret) {
+  if (receivedSecret !== expectedSecret) {
     return json({ error: 'Unauthorized', code: 'bad_hook_secret' }, 401)
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  const vapidJson = Deno.env.get('VAPID_KEYS_JSON')
-  const vapidSubject = Deno.env.get('VAPID_SUBJECT')
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')?.trim()
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()
+  const vapidJson = Deno.env.get('VAPID_KEYS_JSON')?.trim()
+  const vapidSubject = Deno.env.get('VAPID_SUBJECT')?.trim()
   if (!supabaseUrl || !serviceRoleKey || !vapidJson || !vapidSubject) {
     return json({
       error: 'Push function secrets are not configured.',
@@ -129,7 +130,7 @@ Deno.serve(async (request) => {
     const exported = JSON.parse(vapidJson) as webpush.ExportedVapidKeys
     const keys = await webpush.importVapidKeys(exported)
     applicationServer = await webpush.ApplicationServer.new({ contactInformation: vapidSubject, vapidKeys: keys })
-    vapidPublicKey = await webpush.exportApplicationServerKey(keys)
+    vapidPublicKey = (await webpush.exportApplicationServerKey(keys)).trim()
   } catch (error) {
     return json({
       error: 'VAPID_KEYS_JSON is invalid. Copy the full line from PUSH-VALUES.txt again.',
@@ -195,7 +196,7 @@ Deno.serve(async (request) => {
       .eq('id', orderId)
       .eq('store_id', storeId)
       .maybeSingle(),
-    supabase.from('stores').select('name').eq('id', storeId).maybeSingle(),
+    supabase.from('stores').select('name, owner_id').eq('id', storeId).maybeSingle(),
     supabase
       .from('store_members')
       .select('user_id, roles(permissions)')
@@ -205,11 +206,15 @@ Deno.serve(async (request) => {
   if (orderError || !order) return json({ error: 'Order not found.' }, 404)
   if (memberError) return json({ error: 'Could not resolve order viewers.' }, 500)
 
-  const eligibleUserIds = (members ?? []).flatMap((member: any) => {
+  const memberUserIds = (members ?? []).flatMap((member: any) => {
     const role = Array.isArray(member.roles) ? member.roles[0] : member.roles
     const permissions = Array.isArray(role?.permissions) ? role.permissions : []
     return permissions.includes('*') || permissions.includes('orders.read') ? [member.user_id] : []
   })
+  const eligibleUserIds = [...new Set([
+    ...memberUserIds,
+    ...(store?.owner_id ? [store.owner_id] : []),
+  ])]
   if (!eligibleUserIds.length) return json({ sent: 0, reason: 'no_eligible_members' })
 
   const { data: subscriptions, error: subscriptionError } = await supabase

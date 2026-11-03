@@ -65,15 +65,16 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
       return { ...p, price: mp?.price ?? null, compare_at_price: mp?.compare_at_price ?? null, currency }
     })
 
-    const proto2 = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.startsWith('localhost') ? 'http' : 'https'
-    const rootDomain2 = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'
+    const rootDomain2 = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000').trim()
+    const isLocal2 = rootDomain2.startsWith('localhost')
+    const apiBase2 = isLocal2 ? `http://${rootDomain2}` : ''
     const builderJson = {
       ...directPage.builder_json,
       themeSettings: {
         ...(directPage.builder_json?.themeSettings ?? {}),
         currency, market_id: marketId,
         store_id: parentStore.id, // commandes vers la boutique parente
-        api_base: `${proto2}://${rootDomain2}`,
+        api_base: apiBase2,
         shipping_fee: market?.shipping_fee ?? 0,
       },
     }
@@ -157,7 +158,7 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
   })
 
   // ── api_base : vide en production (même domaine), localhost en dev ────────
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'
+  const rootDomain = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000').trim()
   const isLocal = rootDomain.startsWith('localhost')
   const apiBase = isLocal ? `http://${rootDomain}` : ''
 
