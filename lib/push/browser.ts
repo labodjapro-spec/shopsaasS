@@ -25,6 +25,36 @@ function urlBase64ToUint8Array(base64String: string) {
   return Uint8Array.from(raw, (char) => char.charCodeAt(0))
 }
 
+function bufferToBase64Url(buffer: ArrayBuffer | null | undefined) {
+  if (!buffer) return ''
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte) })
+  return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/** Key used when this browser subscribed (base64url), or '' if unknown. */
+export function subscriptionKey(subscription: PushSubscription | null) {
+  return bufferToBase64Url(subscription?.options?.applicationServerKey)
+}
+
+/**
+ * Returns a subscription signed with the CURRENT VAPID key. A subscription made
+ * with an old key is silently rejected (403) by Google/Apple, so we replace it.
+ */
+async function getFreshSubscription(registration: ServiceWorkerRegistration, applicationServerKey: string) {
+  const existing = await registration.pushManager.getSubscription()
+  if (existing) {
+    const key = subscriptionKey(existing)
+    if (!key || key === applicationServerKey) return existing
+    await existing.unsubscribe().catch(() => undefined)
+  }
+  return registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(applicationServerKey) as BufferSource,
+  })
+}
+
 export async function savePushSubscription() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     throw new Error('Ce navigateur ne prend pas en charge les notifications Push.')
@@ -39,11 +69,7 @@ export async function savePushSubscription() {
   }
 
   const registration = await navigator.serviceWorker.ready
-  const subscription = await registration.pushManager.getSubscription() ??
-    await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(applicationServerKey) as BufferSource,
-    })
+  const subscription = await getFreshSubscription(registration, applicationServerKey)
 
   const response = await fetch('/api/push/subscribe', {
     method: 'POST',
@@ -73,4 +99,57 @@ export async function removePushSubscription() {
     await subscription.unsubscribe().catch(() => undefined)
   }
   setPushFlag(false)
+}
+
+export type PushCheck = { id: string; label: string; ok: boolean; detail?: string; fix?: string }
+
+/** Runs the full server-side diagnostic and sends a test notification. */
+export async function runPushDiagnostic(): Promise<{ ok: boolean; checks: PushCheck[] }> {
+  const local: PushCheck[] = []
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+  local.push({
+    id: 'support',
+    label: 'Navigateur compatible',
+    ok: supported,
+    detail: supported ? 'Oui' : 'Ce navigateur ne gère pas le push',
+    fix: 'Ouvre ShopSaaS dans Chrome (Android) ou installe l’app.',
+  })
+  if (!supported) return { ok: false, checks: local }
+
+  const permission = Notification.permission
+  local.push({
+    id: 'permission',
+    label: 'Permission notifications',
+    ok: permission === 'granted',
+    detail: permission === 'granted' ? 'Autorisée' : permission === 'denied' ? 'Bloquée' : 'Pas encore demandée',
+    fix: permission === 'denied'
+      ? 'Réglages du téléphone → Applications → ShopSaaS (ou Chrome) → Notifications → Autoriser.'
+      : 'Appuie sur « Activer les alertes ».',
+  })
+
+  const registration = await navigator.serviceWorker.getRegistration('/')
+  local.push({
+    id: 'sw',
+    label: 'Service worker actif',
+    ok: Boolean(registration?.active),
+    detail: registration?.active ? 'Oui' : 'Non enregistré',
+    fix: 'Recharge la page une fois.',
+  })
+  const subscription = registration ? await registration.pushManager.getSubscription() : null
+
+  const response = await fetch('/api/push/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      endpoint: subscription?.endpoint ?? '',
+      applicationServerKey: subscriptionKey(subscription),
+    }),
+  })
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok && !Array.isArray(result.checks)) {
+    local.push({ id: 'api', label: 'Diagnostic serveur', ok: false, detail: result.error || `Erreur ${response.status}` })
+    return { ok: false, checks: local }
+  }
+  const checks = [...local, ...(result.checks ?? [])]
+  return { ok: checks.every((c: PushCheck) => c.ok), checks }
 }

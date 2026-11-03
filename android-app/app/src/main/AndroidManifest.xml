@@ -42,14 +42,24 @@
             </intent-filter>
         </activity>
 
+        <!-- Receives the notifications from Chrome so they appear under "ShopSaaS". -->
         <service
             android:name="com.google.androidbrowserhelper.trusted.DelegationService"
             android:enabled="true"
             android:exported="true">
+            <!-- Small white icon in the status bar (the "pastille"). Must be monochrome. -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.SMALL_ICON"
+                android:resource="@drawable/ic_notification" />
             <intent-filter>
                 <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </service>
+
+        <!-- REQUIRED on Android 13+: without it, the app can never get notification permission. -->
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity"
+            android:exported="false" />
     </application>
 </manifest>

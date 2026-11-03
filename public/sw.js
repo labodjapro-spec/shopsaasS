@@ -1,4 +1,4 @@
-/* ShopSaaS merchant app — v5 */
+/* ShopSaaS merchant app — v6 */
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
 })
@@ -58,26 +58,44 @@ async function handlePush(event) {
 
   const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
   const focusedMerchant = windows.find((client) => client.focused && isMerchantClient(client))
-  if (focusedMerchant) {
+  // A test push must always show a real system notification.
+  if (focusedMerchant && !payload.test) {
     focusedMerchant.postMessage(message)
     return
   }
 
-  windows.filter(isMerchantClient).forEach((client) => client.postMessage(message))
+  if (!payload.test) windows.filter(isMerchantClient).forEach((client) => client.postMessage(message))
 
   await self.registration.showNotification(title, {
     body,
     icon: '/icons/app-192.png',
     badge: '/icons/app-badge.png',
-    image: '/icons/app-512.png',
     data: { url, orderId: message.orderId },
     tag,
-    renotify: false,
+    renotify: true,
     requireInteraction: true,
     vibrate: [180, 70, 180],
     timestamp: Date.now(),
   })
 }
+
+// The browser can rotate the push subscription at any time (often while the
+// app is closed). Re-subscribe with the same key and tell the server, otherwise
+// pushes silently stop arriving.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    const options = event.oldSubscription?.options
+    const subscription = event.newSubscription ||
+      (options ? await self.registration.pushManager.subscribe(options) : null)
+    if (!subscription) return
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: subscription.toJSON(), userAgent: self.navigator.userAgent }),
+    }).catch(() => undefined)
+  })())
+})
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()

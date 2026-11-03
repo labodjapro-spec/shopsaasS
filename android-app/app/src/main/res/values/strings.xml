@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ShopSaaS</string>
-    <!-- URL stable Vercel — ne change pas à chaque déploiement -->
+    <!-- Stable production URL (does not change with each deployment). Without https:// -->
     <string name="hostName">shopsaas-s-one.vercel.app</string>
     <string name="launchUrl">https://shopsaas-s-one.vercel.app/dashboard</string>
     <string name="assetStatements">[{ \"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\":\"web\",\"site\":\"https://shopsaas-s-one.vercel.app\"} }]</string>

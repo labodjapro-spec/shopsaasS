@@ -5,7 +5,10 @@
 export async function dispatchOrderPush(storeId: string, orderId: string) {
   const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const hookSecret = process.env.PUSH_HOOK_SECRET
-  if (!projectUrl || !hookSecret) return
+  if (!projectUrl || !hookSecret) {
+    console.warn('[push] skipped: NEXT_PUBLIC_SUPABASE_URL or PUSH_HOOK_SECRET is missing on the server')
+    return
+  }
 
   try {
     const response = await fetch(`${projectUrl}/functions/v1/push-order`, {
@@ -18,8 +21,11 @@ export async function dispatchOrderPush(storeId: string, orderId: string) {
       cache: 'no-store',
       signal: AbortSignal.timeout(20000),
     })
+    const result = await response.text().catch(() => '')
     if (!response.ok) {
-      console.warn('[push] Edge Function returned', response.status)
+      console.warn('[push] Edge Function returned', response.status, result.slice(0, 500))
+    } else {
+      console.info('[push] Edge Function result:', result.slice(0, 500))
     }
   } catch (error) {
     console.warn('[push] unable to dispatch notification:', error)

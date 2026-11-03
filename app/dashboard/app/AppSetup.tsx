@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Bell, CheckCircle2, Download, Smartphone } from 'lucide-react'
+import { Bell, CheckCircle2, Download, Smartphone, Stethoscope, XCircle } from 'lucide-react'
 import InstallAppButton from '@/app/InstallAppButton'
 import { isIosDevice, isStandaloneDisplay, subscribeInstallPrompt } from '@/lib/pwa/install'
-import { isPushFlagEnabled, removePushSubscription, savePushSubscription } from '@/lib/push/browser'
+import { isPushFlagEnabled, removePushSubscription, runPushDiagnostic, savePushSubscription, type PushCheck } from '@/lib/push/browser'
 
 export default function AppSetup() {
   const [installed, setInstalled] = useState(false)
@@ -14,6 +14,23 @@ export default function AppSetup() {
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported')
+  const [testing, setTesting] = useState(false)
+  const [diagnostic, setDiagnostic] = useState<{ ok: boolean; checks: PushCheck[] } | null>(null)
+
+  async function testPush() {
+    setTesting(true)
+    setDiagnostic(null)
+    try {
+      const result = await runPushDiagnostic()
+      setDiagnostic(result)
+      if (result.ok) toast.success('Notification test envoyée. Elle doit apparaître dans quelques secondes.')
+      else toast.error('Un réglage bloque les notifications. Regarde la liste.')
+    } catch (error: any) {
+      toast.error(error?.message || 'Le test a échoué.')
+    } finally {
+      setTesting(false)
+    }
+  }
 
   useEffect(() => {
     setInstalled(isStandaloneDisplay())
@@ -130,7 +147,38 @@ export default function AppSetup() {
                   {pushBusy ? 'Activation…' : 'Activer les alertes'}
                 </button>
               )}
+              <button
+                type="button"
+                onClick={testPush}
+                disabled={testing}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-bold text-violet-800 hover:bg-violet-100 disabled:opacity-60"
+              >
+                <Stethoscope className="size-4" />
+                {testing ? 'Test en cours…' : 'Tester les notifications'}
+              </button>
             </div>
+            {diagnostic && (
+              <ul className="mt-4 space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                {diagnostic.checks.map((check: PushCheck) => (
+                  <li key={check.id} className="flex items-start gap-2 text-sm">
+                    {check.ok
+                      ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                      : <XCircle className="mt-0.5 size-4 shrink-0 text-red-600" />}
+                    <div className="min-w-0">
+                      <p className="font-semibold text-zinc-900">{check.label}</p>
+                      {check.detail && <p className="text-xs text-zinc-600 break-words">{check.detail}</p>}
+                      {!check.ok && check.fix && <p className="mt-0.5 text-xs font-medium text-red-700">→ {check.fix}</p>}
+                    </div>
+                  </li>
+                ))}
+                {diagnostic.ok && (
+                  <li className="rounded-lg bg-emerald-50 p-2 text-xs font-medium text-emerald-800">
+                    Tout est bon côté serveur. Si la notification test n’apparaît pas, le blocage vient du téléphone :
+                    notifications de l’app / de Chrome désactivées, mode Ne pas déranger, ou économie de batterie.
+                  </li>
+                )}
+              </ul>
+            )}
           </div>
         </div>
       </section>
@@ -140,10 +188,9 @@ export default function AppSetup() {
           <Download className="size-4" /> Application telephone (APK)
         </h2>
         <ol className="mt-3 list-decimal space-y-2 pl-5">
-          <li>Sur PC, ouvre le dossier <strong>android-app</strong> avec Android Studio.</li>
-          <li>Remplace l’adresse du site dans <strong>app/src/main/res/values/strings.xml</strong>.</li>
+          <li>Sur PC, ouvre le dossier <strong>android-app</strong> avec Android Studio (voir GUIDE-APP-ANDROID.md).</li>
           <li>Build → Build APK(s), puis envoie le fichier aux telephones.</li>
-          <li>Installe l’APK, connecte-toi, puis active les alertes une seule fois.</li>
+          <li>Installe l’APK, connecte-toi, active les alertes, puis appuie sur « Tester les notifications ».</li>
         </ol>
       </section>
     </div>
