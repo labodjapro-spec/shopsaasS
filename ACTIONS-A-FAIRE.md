@@ -71,6 +71,8 @@ Le projet Android (`android-app`) a été corrigé :
 - `app/api/push/test/route.ts` : route de diagnostic complet du Push
 - `app/dashboard/app/AppSetup.tsx` : bouton « Tester les notifications » et checklist visuelle
 - `lib/push/browser.ts` & `lib/push/dispatch-order-push.ts` : renouvellement automatique si la clé VAPID a changé + logs détaillés
-- `public/sw.js` : Service Worker v6 (renouvellement auto `pushsubscriptionchange`, notification propre)
+- `public/sw.js` : Service Worker v7 (affiche systématiquement la notification système sur 100 % des push + renouvellement auto `pushsubscriptionchange`)
 - `public/icons/app-badge.png` : pastille de notification convertie en blanc sur fond transparent
 - `android-app/...` : permission Android 13+ (`NotificationPermissionRequestActivity`) + pastille `ic_notification.xml` + configuration Gradle
+- Nettoyage automatique (`.trim()`) de toutes les variables d'environnement Vercel/Supabase qui contenaient un retour à la ligne (`\n`) caché
+

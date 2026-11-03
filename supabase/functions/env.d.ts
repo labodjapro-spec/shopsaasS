@@ -54,3 +54,4 @@ declare module 'jsr:@negrel/webpush@0.5.0' {
   export function importVapidKeys(keys: ExportedVapidKeys): Promise<CryptoKeyPair>
   export function exportApplicationServerKey(keys: CryptoKeyPair): Promise<string>
 }
+
