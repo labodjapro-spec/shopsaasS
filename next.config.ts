@@ -10,8 +10,15 @@ const nextConfig: NextConfig = {
         // Permettre le chargement du manifest depuis n'importe quelle origine Vercel
         source: '/manifest.webmanifest',
         headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
           { key: 'Content-Type', value: 'application/manifest+json' },
+          { key: 'Cache-Control', value: 'no-cache' },
+        ],
+      },
+      {
+        source: '/.well-known/assetlinks.json',
+        headers: [
+          { key: 'Content-Type', value: 'application/json' },
+          { key: 'Cache-Control', value: 'no-cache' },
         ],
       },
       {

@@ -185,6 +185,7 @@ export default async function DashboardHome({
         label: 'Membres',
         value: String(members.count ?? 0),
         note: 'Accès à la boutique',
+        hideOnMobile: true,
         ...METRIC_STYLES[3],
       },
       {
@@ -205,26 +206,25 @@ export default async function DashboardHome({
         )}
 
         {/* ── Header ── */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
+        <div className="mb-5">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 md:text-3xl">
             {firstName ? `${firstName}` : 'Bonjour'} 👋
           </h1>
           <p className="mt-1 text-sm text-zinc-500">Vue d&apos;ensemble de ta boutique</p>
         </div>
 
-        {/* ── Metric cards ── */}
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-semibold text-zinc-700">Résumé de la boutique</p>
           <DateRange />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {metrics.map((metric, i) => {
             const Icon = metric.icon
             return (
               <div
                 key={metric.label}
-                className={`metric-card dash-fade-up dash-card-${i + 1} relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm ${metric.border}`}
+                className={`metric-card dash-fade-up dash-card-${i + 1} relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm ${metric.border} ${(metric as any).hideOnMobile ? 'hidden sm:block' : ''}`}
               >
                 {/* Fond décoratif */}
                 <div

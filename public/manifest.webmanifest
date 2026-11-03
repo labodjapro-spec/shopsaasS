@@ -1,0 +1,28 @@
+{
+  "id": "shopsaas-merchant",
+  "name": "ShopSaaS",
+  "short_name": "ShopSaaS",
+  "lang": "fr",
+  "description": "Gere tes boutiques et recois les commandes, meme ecran verrouille.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#6d28d9",
+  "theme_color": "#6d28d9",
+  "prefer_related_applications": false,
+  "categories": ["business", "shopping"],
+  "icons": [
+    { "src": "/icons/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Commandes",
+      "short_name": "Commandes",
+      "url": "/dashboard/orders",
+      "icons": [{ "src": "/icons/app-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

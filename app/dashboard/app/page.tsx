@@ -1,16 +1,5 @@
-import { requireStore } from '@/lib/context'
-import { PageHeader } from '@/components/ui'
-import AppSetup from './AppSetup'
+import { redirect } from 'next/navigation'
 
-export default async function MerchantAppPage() {
-  await requireStore()
-  return (
-    <div className="max-w-2xl">
-      <PageHeader
-        title="Application"
-        subtitle="Installe ShopSaaS sur tes appareils et reçois les commandes même quand tu n’es pas sur le site."
-      />
-      <AppSetup />
-    </div>
-  )
+export default function MerchantAppRedirect() {
+  redirect('/dashboard/settings#application')
 }

@@ -1,12 +1,12 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react'
 
-const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
-const DAYS_FR = ['Lu','Ma','Me','Je','Ve','Sa','Di']
-
+const MONTHS_FR = ['Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre']
+const DAYS_FR = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
 const PRESETS = [
   { label: "Aujourd'hui", value: 'today' },
   { label: 'Hier', value: 'yesterday' },
@@ -17,33 +17,35 @@ const PRESETS = [
 ]
 
 function isoDate(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-interface MonthGridProps {
+function formatShort(value: string) {
+  if (!value) return ''
+  return new Date(`${value}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
+
+function MonthGrid({
+  month, from, to, hovering, onPick, onHover,
+}: {
   month: Date
   from: string
   to: string
   hovering: string
   onPick: (v: string) => void
   onHover: (v: string) => void
-}
-
-function MonthGrid({ month, from, to, hovering, onPick, onHover }: MonthGridProps) {
+}) {
   const year = month.getFullYear()
   const m = month.getMonth()
   const firstDay = new Date(year, m, 1)
   const daysInMonth = new Date(year, m + 1, 0).getDate()
-  const offset = (firstDay.getDay() + 6) % 7 // Mon=0
-
+  const offset = (firstDay.getDay() + 6) % 7
   const cells: (string | null)[] = Array(offset).fill(null)
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(isoDate(new Date(year, m, d)))
-  }
+  for (let d = 1; d <= daysInMonth; d++) cells.push(isoDate(new Date(year, m, d)))
   while (cells.length % 7 !== 0) cells.push(null)
 
   return (
-    <div className="min-w-[224px]">
+    <div className="w-full">
       <p className="mb-3 text-center text-sm font-semibold text-zinc-800">
         {MONTHS_FR[m]} {year}
       </p>
@@ -65,17 +67,13 @@ function MonthGrid({ month, from, to, hovering, onPick, onHover }: MonthGridProp
               onClick={() => onPick(v)}
               onMouseEnter={() => onHover(v)}
               className={[
-                'relative py-1.5 text-xs font-medium transition-colors rounded-lg',
-                isEndpoint
-                  ? 'bg-violet-600 text-white'
-                  : inRange
-                    ? 'bg-violet-100 text-violet-800'
-                    : 'text-zinc-700 hover:bg-violet-50 hover:text-violet-700',
-                isFrom ? 'rounded-l-full' : '',
-                isTo ? 'rounded-r-full' : '',
+                'h-11 text-sm font-semibold transition-colors',
+                isEndpoint ? 'bg-violet-600 text-white' : inRange ? 'bg-violet-100 text-violet-800' : 'text-zinc-700 hover:bg-violet-50',
+                isFrom && (to || hovering) ? 'rounded-l-full' : 'rounded-full',
+                isTo && from ? 'rounded-r-full' : '',
               ].join(' ')}
             >
-              {parseInt(v.slice(-2))}
+              {parseInt(v.slice(-2), 10)}
             </button>
           )
         })}
@@ -90,165 +88,191 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
   const current = params.get('range') ?? '7d'
   const fromParam = params.get('from') ?? ''
   const toParam = params.get('to') ?? ''
-
   const [open, setOpen] = useState(false)
   const [hovering, setHovering] = useState('')
+  const [mobile, setMobile] = useState(false)
+  const [draftFrom, setDraftFrom] = useState(fromParam)
+  const [draftTo, setDraftTo] = useState(toParam)
   const [leftMonth, setLeftMonth] = useState(() => {
     const now = new Date()
-    return new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    return new Date(now.getFullYear(), now.getMonth(), 1)
   })
   const rightMonth = new Date(leftMonth.getFullYear(), leftMonth.getMonth() + 1, 1)
-
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Fermer si clic dehors
   useEffect(() => {
+    const sync = () => setMobile(window.innerWidth < 768)
+    sync()
+    window.addEventListener('resize', sync)
+    return () => window.removeEventListener('resize', sync)
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    setDraftFrom(fromParam)
+    setDraftTo(toParam)
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
+      if (!mobile && dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+    document.body.style.overflow = mobile ? 'hidden' : ''
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.body.style.overflow = ''
+    }
+  }, [open, mobile, fromParam, toParam])
+
+  function pushParams(next: URLSearchParams) {
+    router.push(`?${next.toString()}`)
+  }
 
   function setRange(range: string) {
     const next = new URLSearchParams(params.toString())
     next.set('range', range)
     next.delete('from')
     next.delete('to')
-    router.push(`?${next.toString()}`)
+    pushParams(next)
     setOpen(false)
   }
 
   function pickDate(value: string) {
+    if (!draftFrom || (draftFrom && draftTo)) {
+      setDraftFrom(value)
+      setDraftTo('')
+      return
+    }
+    if (value < draftFrom) {
+      setDraftTo(draftFrom)
+      setDraftFrom(value)
+      return
+    }
+    setDraftTo(value)
+  }
+
+  function applyCustom() {
+    if (!draftFrom) return
     const next = new URLSearchParams(params.toString())
     next.set('range', 'custom')
-    if (!fromParam || (fromParam && toParam)) {
-      next.set('from', value)
-      next.delete('to')
-    } else if (value < fromParam) {
-      next.set('from', value)
-      next.set('to', fromParam)
-      setOpen(false)
-    } else {
-      next.set('to', value)
-      setOpen(false)
-    }
-    router.push(`?${next.toString()}`)
+    next.set('from', draftFrom)
+    if (draftTo) next.set('to', draftTo)
+    else next.delete('to')
+    pushParams(next)
+    setOpen(false)
   }
 
-  // Label affiché dans le bouton
   const activePreset = PRESETS.find(p => p.value === current)
-  let displayLabel = activePreset?.label ?? 'Période'
+  let displayLabel = activePreset?.label ?? 'Periode'
   if (current === 'custom') {
-    if (fromParam && toParam) {
-      const fmt = (s: string) => new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-      displayLabel = `${fmt(fromParam)} → ${fmt(toParam)}`
-    } else if (fromParam) {
-      displayLabel = `À partir du ${new Date(fromParam).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`
-    } else {
-      displayLabel = 'Personnalisée'
-    }
+    if (fromParam && toParam) displayLabel = `${formatShort(fromParam)} - ${formatShort(toParam)}`
+    else if (fromParam) displayLabel = `Depuis ${formatShort(fromParam)}`
+    else displayLabel = 'Personnalisee'
   }
+
+  const presets = (
+    <div className={mobile ? 'flex gap-2 overflow-x-auto px-4 pb-1' : 'flex min-w-[168px] flex-col gap-1 border-r border-zinc-100 bg-zinc-50 p-3'}>
+      {PRESETS.map(preset => (
+        <button
+          key={preset.value}
+          type="button"
+          onClick={() => setRange(preset.value)}
+          className={`${mobile ? 'shrink-0 rounded-full bg-zinc-100 px-3 py-2' : 'w-full rounded-xl px-3 py-2.5 text-left hover:bg-white'} text-sm font-semibold ${
+            current === preset.value && current !== 'custom'
+              ? 'bg-violet-600 text-white hover:bg-violet-600'
+              : 'text-zinc-700'
+          }`}
+        >
+          {preset.label}
+        </button>
+      ))}
+    </div>
+  )
+
+  const calendar = (
+    <div className="flex flex-1 flex-col p-4">
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Du</p>
+          <p className="text-sm font-bold text-zinc-800">{draftFrom ? formatShort(draftFrom) : 'Date de debut'}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Au</p>
+          <p className="text-sm font-bold text-zinc-800">{draftTo ? formatShort(draftTo) : 'Date de fin'}</p>
+        </div>
+      </div>
+      <div className="mb-3 flex items-center justify-between">
+        <button type="button" onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() - 1, 1))} className="flex size-10 items-center justify-center rounded-full hover:bg-zinc-100">
+          <ChevronLeft className="size-4" />
+        </button>
+        <p className="text-sm font-semibold text-zinc-800">
+          {!draftFrom ? 'Choisis la date de debut' : !draftTo ? 'Choisis la date de fin' : `${formatShort(draftFrom)} - ${formatShort(draftTo)}`}
+        </p>
+        <button type="button" onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() + 1, 1))} className="flex size-10 items-center justify-center rounded-full hover:bg-zinc-100">
+          <ChevronRight className="size-4" />
+        </button>
+      </div>
+      <div className={`flex gap-6 ${mobile ? 'justify-center' : ''}`} onMouseLeave={() => setHovering('')}>
+        <MonthGrid month={leftMonth} from={draftFrom} to={draftTo} hovering={hovering} onPick={pickDate} onHover={setHovering} />
+        {!mobile && (
+          <div className="hidden sm:block">
+            <MonthGrid month={rightMonth} from={draftFrom} to={draftTo} hovering={hovering} onPick={pickDate} onHover={setHovering} />
+          </div>
+        )}
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-2 border-t border-zinc-100 pt-3">
+        <button
+          type="button"
+          onClick={() => { setDraftFrom(''); setDraftTo('') }}
+          className="text-sm font-semibold text-zinc-500"
+        >
+          Effacer
+        </button>
+        <button
+          type="button"
+          disabled={!draftFrom}
+          onClick={applyCustom}
+          className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+        >
+          Appliquer
+        </button>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className={`relative ${mobile ? 'w-full' : ''}`} ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:border-violet-300 hover:text-violet-700 transition-colors"
+        className="flex w-full max-w-full items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-medium text-zinc-700 shadow-sm md:w-auto"
       >
-        <CalendarDays className="size-4 text-zinc-400" />
-        <span>{compact ? 'Période' : displayLabel}</span>
-        <span className="text-xs text-violet-600 font-semibold">{compact ? displayLabel : ''}</span>
-        <ChevronRight className={`size-4 text-zinc-400 transition-transform ${open ? 'rotate-90' : ''}`} />
+        <CalendarDays className="size-4 shrink-0 text-zinc-400" />
+        <span className="truncate">{compact ? displayLabel : displayLabel}</span>
       </button>
 
-      {open && (
-        <div className={`absolute top-11 z-50 flex flex-col sm:flex-row gap-0 rounded-2xl border border-zinc-200 bg-white shadow-2xl overflow-hidden ${align === 'left' ? 'left-0' : 'right-0'}`}
-          style={{ minWidth: 'min(100vw - 1rem, 520px)', maxWidth: '100vw' }}>
-          {/* Colonne gauche — presets */}
-          <div className="border-b sm:border-b-0 sm:border-r border-zinc-100 p-3 sm:min-w-[160px] bg-zinc-50/60">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400 px-2">Raccourcis</p>
-            {PRESETS.map(preset => (
-              <button
-                key={preset.value}
-                type="button"
-                onClick={() => setRange(preset.value)}
-                className={`w-full text-left rounded-xl px-3 py-2 text-sm transition-colors mb-0.5 ${
-                  current === preset.value && current !== 'custom'
-                    ? 'bg-violet-600 text-white font-semibold'
-                    : 'text-zinc-700 hover:bg-white hover:shadow-sm'
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-            <div className="my-2 border-t border-zinc-200" />
-            <button
-              type="button"
-              onClick={() => {
-                const next = new URLSearchParams(params.toString())
-                next.set('range', 'custom')
-                next.delete('from'); next.delete('to')
-                router.push(`?${next.toString()}`)
-              }}
-              className={`w-full text-left rounded-xl px-3 py-2 text-sm transition-colors ${
-                current === 'custom'
-                  ? 'bg-violet-600 text-white font-semibold'
-                  : 'text-zinc-700 hover:bg-white hover:shadow-sm'
-              }`}
-            >
-              Personnalisée
-            </button>
-          </div>
-
-          {/* Calendrier — un mois sur mobile, deux sur desktop */}
-          <div className="flex flex-col p-4 gap-3">
-            <div className="flex items-center justify-between mb-1">
-              <button type="button" onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() - 1, 1))} className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors text-zinc-500">
-                <ChevronLeft className="size-4" />
-              </button>
-              {fromParam && !toParam && (
-                <span className="text-xs text-violet-600 font-medium bg-violet-50 px-3 py-1 rounded-full">
-                  Sélectionnez la date de fin
-                </span>
-              )}
-              {!fromParam && <span className="text-xs text-zinc-400">Choisir la période</span>}
-              {fromParam && toParam && (
-                <button type="button" onClick={() => { const next = new URLSearchParams(params.toString()); next.delete('from'); next.delete('to'); next.set('range', 'custom'); router.push(`?${next.toString()}`) }} className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-500 transition-colors">
-                  <X className="size-3" /> Réinitialiser
-                </button>
-              )}
-              <button type="button" onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() + 1, 1))} className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors text-zinc-500">
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
-
-            {/* Un mois sur mobile, deux sur sm+ */}
-            <div className="flex gap-6" onMouseLeave={() => setHovering('')}>
-              <MonthGrid month={leftMonth} from={fromParam} to={toParam} hovering={hovering} onPick={pickDate} onHover={setHovering} />
-              <div className="hidden sm:block">
-                <MonthGrid month={rightMonth} from={fromParam} to={toParam} hovering={hovering} onPick={pickDate} onHover={setHovering} />
-              </div>
-            </div>
-
-            {fromParam && (
-              <div className="border-t border-zinc-100 pt-3 flex items-center justify-between text-xs text-zinc-500">
-                <span>
-                  {fromParam && <span className="font-semibold text-violet-700">{new Date(fromParam).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>}
-                  {toParam && <> → <span className="font-semibold text-violet-700">{new Date(toParam).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span></>}
-                </span>
-                {fromParam && toParam && (
-                  <button type="button" onClick={() => setOpen(false)} className="bg-violet-600 text-white rounded-lg px-3 py-1.5 font-semibold hover:bg-violet-700 transition-colors">
-                    Appliquer
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+      {open && !mobile && (
+        <div className={`absolute top-12 z-50 flex overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl ${align === 'left' ? 'left-0' : 'right-0'}`}>
+          {presets}
+          {calendar}
         </div>
+      )}
+
+      {open && mobile && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[80] flex items-end bg-black/40 md:hidden" onClick={() => setOpen(false)}>
+          <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl" onClick={event => event.stopPropagation()}>
+            <div className="sticky top-0 z-10 rounded-t-3xl bg-white">
+              <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-zinc-200" />
+              <div className="flex items-center justify-between px-4 py-3">
+                <p className="text-base font-bold">Periode</p>
+                <button type="button" onClick={() => setOpen(false)} className="flex size-9 items-center justify-center rounded-full bg-zinc-100" aria-label="Fermer">
+                  <X className="size-4" />
+                </button>
+              </div>
+              {presets}
+            </div>
+            {calendar}
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

@@ -1,4 +1,4 @@
-/* ShopSaaS merchant app — v3. Do not cache private dashboard data. */
+/* ShopSaaS merchant app — v5 */
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
 })
@@ -9,9 +9,21 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const request = event.request
-  if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return
+  if (request.method !== 'GET') return
+  const url = new URL(request.url)
+  if (url.origin !== self.location.origin) return
+  if (url.pathname === '/sw.js' || url.pathname === '/manifest.webmanifest') return
   event.respondWith(fetch(request))
 })
+
+function isMerchantClient(client) {
+  try {
+    const path = new URL(client.url).pathname
+    return path.startsWith('/dashboard') || path.startsWith('/boutiques') || path.startsWith('/onboarding')
+  } catch {
+    return false
+  }
+}
 
 self.addEventListener('push', (event) => {
   event.waitUntil(handlePush(event))
@@ -22,38 +34,48 @@ async function handlePush(event) {
   try {
     payload = event.data ? event.data.json() : {}
   } catch {
-    payload = { body: event.data?.text() || 'Une nouvelle commande est arrivée.' }
+    payload = { body: event.data?.text() || 'Une nouvelle commande est arrivee.' }
   }
 
   const title = payload.title || 'Nouvelle commande'
   const tag = payload.tag || 'shopsaas-new-order'
   const url = payload.url || '/dashboard/orders'
+  const body = payload.body || 'Ouvre ShopSaaS pour consulter la commande.'
   const message = {
     type: 'ORDER_PUSH',
     title,
-    body: payload.body || 'Ouvre ShopSaaS pour consulter la commande.',
+    body,
     url,
     tag,
     orderId: payload.orderId || null,
+    customer: payload.customer || '',
+    orderNumber: payload.orderNumber || '',
+    amount: payload.amount || '',
+    currency: payload.currency || '',
+    storeName: payload.storeName || '',
+    total: payload.total || 0,
   }
 
   const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  const focused = windows.find((client) => client.focused)
-  if (focused) {
-    focused.postMessage(message)
+  const focusedMerchant = windows.find((client) => client.focused && isMerchantClient(client))
+  if (focusedMerchant) {
+    focusedMerchant.postMessage(message)
     return
   }
 
-  windows.forEach((client) => client.postMessage(message))
+  windows.filter(isMerchantClient).forEach((client) => client.postMessage(message))
 
   await self.registration.showNotification(title, {
-    body: message.body,
+    body,
     icon: '/icons/app-192.png',
-    badge: '/icons/app-192.png',
+    badge: '/icons/app-badge.png',
+    image: '/icons/app-512.png',
     data: { url, orderId: message.orderId },
     tag,
     renotify: false,
     requireInteraction: true,
+    vibrate: [180, 70, 180],
+    timestamp: Date.now(),
   })
 }
 
@@ -65,7 +87,7 @@ self.addEventListener('notificationclick', (event) => {
 
 async function openOrFocus(target) {
   const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  const existing = windows.find((client) => client.url.startsWith(self.location.origin))
+  const existing = windows.find(isMerchantClient)
   if (existing) {
     await existing.navigate(target)
     return existing.focus()

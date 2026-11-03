@@ -142,51 +142,68 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Le produit ne correspond pas à cette boutique.' }, { status: 400, headers })
       }
     }
-    const lines = variant_id
-      ? [{ variant_id, quantity: quantity ?? 1, price: price ?? 0 }]
-      : [{ title: product ?? 'Produit', quantity: quantity ?? 1, price: price ?? 0 }]
+    const qty = Number(quantity) > 0 ? Number(quantity) : 1
+    const unitPrice = Number(price) || 0
+    const shippingFee = Math.max(0, Number(body.shipping_fee) || 0)
+    const orderTotal = Number(total ?? unitPrice * qty) || 0
+    const titleLine = [{ title: product ?? 'Produit', quantity: qty, price: unitPrice }]
+    const variantLine = variant_id ? [{ variant_id, quantity: qty, price: unitPrice }] : null
+    const customerAddress = String(body.address || city || 'À confirmer').trim() || 'À confirmer'
+    const customerPhone = String(phone).replace(/[^\d+]/g, '')
 
-    // ── Essai RPC ────────────────────────────────────────────────────────
-    if (resolvedMarketId) {
-      const { data: rpcResult, error: rpcError } = await supabase.rpc('create_public_order', {
+    async function createViaRpc(lines: unknown[]) {
+      return supabase.rpc('create_public_order', {
         p_store_id: store_id,
         p_market_id: resolvedMarketId,
         p_name: customer_name,
-        p_phone: phone,
+        p_phone: customerPhone,
         p_city: city ?? '',
-        p_address: String(body.address || city || 'À confirmer'),
+        p_address: customerAddress,
         p_note: email ? `Email: ${email}` : '',
         p_lines: lines,
-        p_subtotal: price ?? 0,
-        p_shipping: Math.max(0, Number(body.shipping_fee) || 0),
-        p_total: total ?? price ?? 0,
+        p_subtotal: Math.max(0, orderTotal - shippingFee),
+        p_shipping: shippingFee,
+        p_total: orderTotal,
       })
+    }
+
+    async function finishOrder(orderId: string) {
+      const { data: createdOrder } = await supabase
+        .from('orders')
+        .select('id, order_number')
+        .eq('id', orderId)
+        .eq('store_id', store_id)
+        .maybeSingle()
+      const orderNumber = createdOrder?.order_number || orderId
+      await Promise.all([
+        dispatchOrderPush(String(store_id), orderId),
+        dispatchMetaPurchase(req, supabase as any, body, String(store_id), orderId, orderNumber),
+        markAbandonedCartConverted(supabase, {
+          storeId: String(store_id),
+          productId: typeof body.product_id === 'string' ? body.product_id : null,
+          sessionId: typeof body.abandoned_session_id === 'string' ? body.abandoned_session_id : null,
+          orderId,
+        }),
+      ])
+      return NextResponse.json({
+        ok: true,
+        number: orderNumber,
+        order_id: orderId,
+        event_id: `purchase_${orderId}`,
+      }, { headers })
+    }
+
+    if (resolvedMarketId) {
+      let { data: rpcResult, error: rpcError } = await createViaRpc(variantLine ?? titleLine)
+      const retryable = ['invalid_variant', 'invalid_variant_price', 'invalid_order_total', 'invalid_order_lines']
+      if (rpcError && variantLine && retryable.some(key => rpcError.message.includes(key))) {
+        console.warn('[orders/create] retrying without variant:', rpcError.message)
+        const retry = await createViaRpc(titleLine)
+        rpcResult = retry.data
+        rpcError = retry.error
+      }
       if (!rpcError) {
-        const orderId = String(rpcResult)
-        const { data: createdOrder } = await supabase
-          .from('orders')
-          .select('id, order_number')
-          .eq('id', orderId)
-          .eq('store_id', store_id)
-          .maybeSingle()
-        // The RPC decrements stock atomically. Do not decrement it a second time.
-        const orderNumber = createdOrder?.order_number || orderId
-        await Promise.all([
-          dispatchOrderPush(String(store_id), orderId),
-          dispatchMetaPurchase(req, supabase as any, body, String(store_id), orderId, orderNumber),
-          markAbandonedCartConverted(supabase, {
-            storeId: String(store_id),
-            productId: typeof body.product_id === 'string' ? body.product_id : null,
-            sessionId: typeof body.abandoned_session_id === 'string' ? body.abandoned_session_id : null,
-            orderId,
-          }),
-        ])
-        return NextResponse.json({
-          ok: true,
-          number: orderNumber,
-          order_id: orderId,
-          event_id: `purchase_${orderId}`,
-        }, { headers })
+        return finishOrder(String(rpcResult))
       }
       console.warn('[orders/create] RPC rejected the order:', rpcError.message)
       const knownErrors: Record<string, string> = {
@@ -195,7 +212,7 @@ export async function POST(req: NextRequest) {
         invalid_market: 'Le marché ne correspond pas à cette boutique.',
         invalid_variant: 'La variante choisie n’existe plus.',
         invalid_variant_price: 'Cette variante n’a pas de prix pour ce marché.',
-        invalid_customer: 'Vérifie le nom, le téléphone et l’adresse de livraison.',
+        invalid_customer: 'Vérifie le nom, le téléphone et la ville. Un numéro à 8 chiffres ou plus suffit, avec ou sans +224.',
         invalid_order_lines: 'Le panier est invalide.',
         invalid_order_total: 'Le total du panier ne correspond pas aux prix de la boutique.',
       }

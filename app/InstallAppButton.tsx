@@ -40,21 +40,21 @@ export default function InstallAppButton({
       return
     }
     if (isIos) {
-      toast('Sur iPhone : touche Partager, puis « Sur l’écran d’accueil ». Ouvre ensuite l’icône ShopSaaS.', { duration: 8000 })
+      toast('Sur iPhone : touche Partager, puis Sur l’ecran d’accueil. Ouvre ensuite l’icone ShopSaaS.', { duration: 8000 })
       return
     }
-    toast('Ouvre ShopSaaS dans Chrome, puis menu ⋮ → « Installer l’application ».', { duration: 8000 })
+    window.location.href = '/dashboard/settings#application'
   }
 
   return (
     <button
       type="button"
       onClick={install}
-      className={className ?? 'inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-100 sm:gap-1.5 sm:px-2.5'}
+      className={className ?? 'inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-100'}
       aria-label="Installer l’application ShopSaaS"
     >
       <Download className="size-4" />
-      <span className="hidden sm:inline">{label}</span>
+      <span>{label}</span>
     </button>
   )
 }

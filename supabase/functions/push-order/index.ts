@@ -48,7 +48,7 @@ Deno.serve(async (request) => {
   const [{ data: order, error: orderError }, { data: store }, { data: members, error: memberError }] = await Promise.all([
     supabase
       .from('orders')
-      .select('id, store_id, order_number, total, markets(currency)')
+      .select('id, store_id, order_number, total, customer_name, markets(currency)')
       .eq('id', orderId)
       .eq('store_id', storeId)
       .maybeSingle(),
@@ -103,12 +103,20 @@ Deno.serve(async (request) => {
   const currency = String((order.markets as any)?.currency ?? '')
   const total = Number(order.total) || 0
   const storeName = String(store?.name ?? 'Boutique')
+  const customer = String(order.customer_name || 'Client').trim()
+  const amount = `${total.toLocaleString('fr-FR')} ${currency}`.trim()
   const payload = JSON.stringify({
-    title: `Nouvelle commande · ${storeName}`,
-    body: `${order.order_number} · ${total.toLocaleString('fr-FR')} ${currency}`.trim(),
+    title: 'Nouvelle commande',
+    body: `${customer}\n${order.order_number} · ${amount}\n${storeName}`,
     url: `/dashboard/orders/${order.id}`,
     tag: `order-${order.id}`,
     orderId: order.id,
+    customer,
+    orderNumber: order.order_number,
+    amount,
+    currency,
+    storeName,
+    total,
   })
 
   let sent = 0

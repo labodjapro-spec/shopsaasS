@@ -14,7 +14,7 @@ export const COUNTRIES: CountryPreset[] = [
   { code: 'ML', name: 'Mali', currency: 'XOF', prefix: '+223', cities: ['Bamako', 'Sikasso', 'Ségou', 'Kayes', 'Mopti'] },
   { code: 'BF', name: 'Burkina Faso', currency: 'XOF', prefix: '+226', cities: ['Ouagadougou', 'Bobo-Dioulasso', 'Koudougou'] },
   { code: 'NE', name: 'Niger', currency: 'XOF', prefix: '+227', cities: ['Niamey', 'Zinder', 'Maradi', 'Tahoua'] },
-  { code: 'GN', name: 'Guinée', currency: 'GNF', prefix: '+224', cities: ['Conakry', 'Kankan', 'Kindia', 'Labé', 'Nzérékoré'] },
+  { code: 'GN', name: 'Guinée', currency: 'GNF', prefix: '+224', cities: ['Conakry', 'Kaloum', 'Dixinn', 'Matam', 'Matoto', 'Ratoma', 'Coyah', 'Dubréka', 'Forécariah', 'Kindia', 'Télimélé', 'Mamou', 'Dalaba', 'Pita', 'Labé', 'Lélouma', 'Mali', 'Koubia', 'Tougué', 'Boké', 'Boffa', 'Fria', 'Gaoual', 'Koundara', 'Kankan', 'Kérouané', 'Kouroussa', 'Mandiana', 'Siguiri', 'Faranah', 'Dabola', 'Dinguiraye', 'Kissidougou', 'Nzérékoré', 'Beyla', 'Guéckédou', 'Lola', 'Macenta', 'Yomou'] },
   { code: 'CM', name: 'Cameroun', currency: 'XAF', prefix: '+237', cities: ['Douala', 'Yaoundé', 'Bafoussam', 'Garoua', 'Bamenda'] },
   { code: 'GA', name: 'Gabon', currency: 'XAF', prefix: '+241', cities: ['Libreville', 'Port-Gentil', 'Franceville'] },
   { code: 'CG', name: 'Congo', currency: 'XAF', prefix: '+242', cities: ['Brazzaville', 'Pointe-Noire'] },

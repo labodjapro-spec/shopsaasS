@@ -233,12 +233,14 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
       const data = event.data
       if (data?.type !== 'ORDER_PUSH') return
       const orderId = data.orderId || String(data.tag || '').replace(/^order-/, '')
+      const amountText = String(data.amount || '')
+      const amountNumber = Number(data.total) || Number(amountText.replace(/[^\d.,]/g, '').replace(/\s/g, '').replace(',', '.')) || 0
       handleNewOrder({
         id: orderId || `push-${Date.now()}`,
-        order_number: String(data.body || 'Nouvelle commande').split(' · ')[0] || 'Commande',
-        customer_name: 'Client',
-        total: 0,
-        currency: '',
+        order_number: data.orderNumber || 'Commande',
+        customer_name: data.customer || 'Client',
+        total: amountNumber,
+        currency: data.currency || '',
       })
     }
     navigator.serviceWorker.addEventListener('message', onMessage)

@@ -16,7 +16,7 @@ export async function dispatchOrderPush(storeId: string, orderId: string) {
       },
       body: JSON.stringify({ storeId, orderId }),
       cache: 'no-store',
-      signal: AbortSignal.timeout(2500),
+      signal: AbortSignal.timeout(20000),
     })
     if (!response.ok) {
       console.warn('[push] Edge Function returned', response.status)
