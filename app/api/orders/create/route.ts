@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
     if (resolvedMarketId) {
       let { data: rpcResult, error: rpcError } = await createViaRpc(variantLine ?? titleLine)
       const retryable = ['invalid_variant', 'invalid_variant_price', 'invalid_order_total', 'invalid_order_lines']
-      if (rpcError && variantLine && retryable.some(key => rpcError.message.includes(key))) {
+      if (rpcError && variantLine && retryable.some(key => rpcError!.message.includes(key))) {
         console.warn('[orders/create] retrying without variant:', rpcError.message)
         const retry = await createViaRpc(titleLine)
         rpcResult = retry.data
