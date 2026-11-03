@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
-import { ShoppingBag, Bell, Volume2 } from 'lucide-react'
+import { ShoppingBag, Bell, Volume2, Truck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isIosDevice, isStandaloneDisplay } from '@/lib/pwa/install'
 import { isPushFlagEnabled, removePushSubscription, savePushSubscription, setPushFlag } from '@/lib/push/browser'
@@ -99,6 +99,76 @@ function showOrderToast(order: { id: string; order_number: string; customer_name
   )
 }
 
+function showDeliveryReminderToast(reminder: {
+  id: string
+  order_number: string
+  customer_name: string
+  customer_city?: string
+  customer_address?: string
+  total: number
+  currency: string
+  note?: string
+}) {
+  const locationText = [reminder.customer_city, reminder.customer_address].filter(Boolean).join(' · ')
+  toast.custom(
+    (t) => (
+      <div
+        className={`relative flex w-[min(440px,calc(100vw-32px))] items-center gap-3 rounded-2xl border-2 border-blue-300 bg-white p-4 shadow-2xl transition-all duration-300 ${
+          t.visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+        }`}
+      >
+        <div className="relative shrink-0">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 shadow-lg shadow-blue-200">
+            <Truck className="size-6 text-white" />
+          </div>
+          <span className="absolute -right-1 -top-1 size-4 rounded-full border-2 border-white bg-amber-500 animate-ping" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-base font-black tracking-tight text-zinc-950">🚚 Livraison maintenant !</p>
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-blue-800">
+              Programmée
+            </span>
+          </div>
+          <p className="mt-1 truncate text-sm text-zinc-700">
+            {reminder.customer_name} · <span className="font-bold text-blue-700">{reminder.order_number}</span>
+          </p>
+          {locationText && (
+            <p className="mt-0.5 truncate text-xs font-medium text-zinc-500">📍 {locationText}</p>
+          )}
+          {reminder.note && (
+            <p className="mt-0.5 truncate text-xs font-semibold text-amber-700">📝 {reminder.note}</p>
+          )}
+          {reminder.total > 0 && (
+            <p className="mt-1 text-base font-black text-blue-700">
+              {reminder.total.toLocaleString('fr-FR')} {reminder.currency}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              toast.dismiss(t.id)
+              window.location.href = `/dashboard/orders/${reminder.id}`
+            }}
+            className="mt-3 inline-flex items-center justify-center rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+          >
+            Ouvrir la commande à livrer <span aria-hidden="true" className="ml-1">→</span>
+          </button>
+        </div>
+        <button
+          type="button"
+          aria-label="Fermer la notification"
+          onClick={(event) => { event.stopPropagation(); toast.dismiss(t.id) }}
+          className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+        >×</button>
+      </div>
+    ),
+    { id: `reminder-toast-${reminder.id}`, duration: 25000, position: 'top-right' },
+  )
+}
+
 interface OrderNotificationProps {
   storeIds: string[]
 }
@@ -109,6 +179,8 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
   const knownIds = useRef<Set<string>>(new Set(
     JSON.parse(typeof window !== 'undefined' ? (sessionStorage.getItem('shopsaas-known-orders') ?? '[]') : '[]')
   ))
+  const knownReminders = useRef<Set<string>>(new Set())
+  const nextReminderTimer = useRef<number | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(false)
   const [pushEnabled, setPushEnabled] = useState(false)
@@ -182,6 +254,24 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
     showOrderToast(order)
   }, [rememberOrder, soundEnabled])
 
+  const handleDeliveryReminder = useCallback((reminder: {
+    id: string
+    order_number: string
+    customer_name: string
+    customer_city?: string
+    customer_address?: string
+    total: number
+    currency: string
+    scheduledAt?: string
+    note?: string
+  }) => {
+    const key = `${reminder.id}:${reminder.scheduledAt || ''}`
+    if (knownReminders.current.has(key)) return
+    knownReminders.current.add(key)
+    if (soundEnabled) playOrderSound(audioRef.current)
+    showDeliveryReminderToast(reminder)
+  }, [soundEnabled])
+
   useEffect(() => {
     const channels = storeIds.map((storeId) =>
       supabase
@@ -211,7 +301,38 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
 
   useEffect(() => {
     if (!storeIds.length) return
+
+    const checkReminders = async () => {
+      try {
+        const res = await fetch(`/api/orders/reminders?store_ids=${encodeURIComponent(storeIds.join(','))}`)
+        const data = await res.json().catch(() => ({ dueReminders: [], upcoming: [] }))
+        for (const rem of data.dueReminders ?? []) {
+          handleDeliveryReminder(rem)
+        }
+
+        // Schedule an exact timeout for the soonest upcoming scheduled order
+        if (nextReminderTimer.current) {
+          window.clearTimeout(nextReminderTimer.current)
+          nextReminderTimer.current = null
+        }
+        const upcoming = Array.isArray(data.upcoming) ? data.upcoming : []
+        if (upcoming.length > 0) {
+          const soonestMs = Math.min(
+            ...upcoming
+              .map((u: any) => new Date(u.scheduledAt).getTime() - Date.now())
+              .filter((ms: number) => !Number.isNaN(ms) && ms >= 0),
+          )
+          if (Number.isFinite(soonestMs) && soonestMs <= 2147483647) {
+            nextReminderTimer.current = window.setTimeout(() => {
+              void checkReminders()
+            }, Math.max(500, soonestMs + 500))
+          }
+        }
+      } catch { /* silencieux */ }
+    }
+
     const poll = async () => {
+      void checkReminders()
       if (document.visibilityState !== 'visible') return
       try {
         const response = await fetch(`/api/orders/poll?store_ids=${encodeURIComponent(storeIds.join(','))}&since=${encodeURIComponent(startedAt.current)}`)
@@ -219,23 +340,39 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
         for (const order of data.orders ?? []) handleNewOrder(order)
       } catch { /* silencieux */ }
     }
+
+    void checkReminders()
     const timer = window.setInterval(poll, 20000)
     const onVisible = () => { if (document.visibilityState === 'visible') void poll() }
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       window.clearInterval(timer)
+      if (nextReminderTimer.current) window.clearTimeout(nextReminderTimer.current)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [handleNewOrder, storeKey, storeIds])
+  }, [handleNewOrder, handleDeliveryReminder, storeKey, storeIds])
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     const onMessage = (event: MessageEvent) => {
       const data = event.data
       if (data?.type !== 'ORDER_PUSH') return
-      const orderId = data.orderId || String(data.tag || '').replace(/^order-/, '')
+      const orderId = data.orderId || String(data.tag || '').replace(/^(order|delivery-reminder)-/, '')
       const amountText = String(data.amount || '')
       const amountNumber = Number(data.total) || Number(amountText.replace(/[^\d.,]/g, '').replace(/\s/g, '').replace(',', '.')) || 0
+
+      if (data.reminder) {
+        handleDeliveryReminder({
+          id: orderId || `rem-${Date.now()}`,
+          order_number: data.orderNumber || 'Commande',
+          customer_name: data.customer || 'Client',
+          total: amountNumber,
+          currency: data.currency || '',
+          note: data.note || '',
+        })
+        return
+      }
+
       handleNewOrder({
         id: orderId || `push-${Date.now()}`,
         order_number: data.orderNumber || 'Commande',
@@ -246,7 +383,7 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
     }
     navigator.serviceWorker.addEventListener('message', onMessage)
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
-  }, [handleNewOrder])
+  }, [handleNewOrder, handleDeliveryReminder])
 
   const enablePush = async () => {
     if (isIosDevice() && !isStandaloneDisplay()) {

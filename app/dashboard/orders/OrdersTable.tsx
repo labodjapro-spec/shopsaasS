@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
+import { formatScheduledDateFr } from '@/lib/orders/scheduled'
 
 const ROW_STYLES: Record<string, { row: string; text: string; sub: string; badge: string }> = {
   new:         { row: 'bg-white hover:bg-zinc-50 border-b border-zinc-100',   text: 'text-zinc-900 font-semibold', sub: 'text-zinc-400',  badge: 'bg-zinc-100 text-zinc-700' },
@@ -25,17 +26,6 @@ const STATUS_LABELS: Record<string, string> = {
   returned: 'Retournée',
 }
 
-const STATUS_BADGES: Record<string, string> = {
-  new: 'bg-violet-100 text-violet-800',
-  confirmed: 'bg-emerald-100 text-emerald-800',
-  unreachable: 'bg-orange-100 text-orange-800',
-  scheduled: 'bg-blue-100 text-blue-800',
-  shipped: 'bg-amber-100 text-amber-800',
-  delivered: 'bg-green-100 text-green-800',
-  cancelled: 'bg-red-100 text-red-800',
-  returned: 'bg-zinc-100 text-zinc-700',
-}
-
 interface Order {
   id: string
   order_number: string
@@ -45,7 +35,17 @@ interface Order {
   total: number
   status: string
   created_at: string
+  scheduled_at?: string | null
   markets: { currency: string } | null
+}
+
+function getStatusBadgeText(order: Order): string {
+  const base = STATUS_LABELS[order.status] ?? order.status
+  if (order.status === 'scheduled' && order.scheduled_at) {
+    const formatted = formatScheduledDateFr(order.scheduled_at)
+    if (formatted) return `${base} · ${formatted}`
+  }
+  return base
 }
 
 export function OrdersTable({ orders }: { orders: Order[] }) {
@@ -57,13 +57,14 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
       <div className="divide-y divide-zinc-100 md:hidden">
         {orders.map(order => {
           const style = ROW_STYLES[order.status] ?? ROW_STYLES.new
+          const badgeText = getStatusBadgeText(order)
           return (
             <button
               key={order.id}
               type="button"
               onClick={() => openOrder(order.id)}
               className={`block w-full p-4 text-left transition focus:outline-none ${style.row}`}
-              aria-label={`Commande ${order.order_number}, ${order.customer_name}, ${STATUS_LABELS[order.status] ?? order.status}, ${formatMoney(order.total, order.markets?.currency ?? 'XOF')}`}
+              aria-label={`Commande ${order.order_number}, ${order.customer_name}, ${badgeText}, ${formatMoney(order.total, order.markets?.currency ?? 'XOF')}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -76,7 +77,7 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${style.badge}`}>
-                  {STATUS_LABELS[order.status] ?? order.status}
+                  {badgeText}
                 </span>
                 <span className={`text-xs ${style.sub}`}>{order.customer_phone}</span>
               </div>
@@ -107,6 +108,7 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
           <tbody>
             {orders.map(order => {
               const style = ROW_STYLES[order.status] ?? ROW_STYLES.new
+              const badgeText = getStatusBadgeText(order)
               return (
                 <tr key={order.id} className={`${style.row} cursor-pointer transition-colors`} onClick={() => openOrder(order.id)}>
                   <td className="px-5 py-4">
@@ -124,7 +126,7 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
                   <td className={`hidden px-5 py-4 lg:table-cell ${style.sub}`}>{order.customer_city || '—'}</td>
                   <td className="px-5 py-4">
                     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${style.badge}`}>
-                      {STATUS_LABELS[order.status] ?? order.status}
+                      {badgeText}
                     </span>
                   </td>
                   <td className={`px-5 py-4 text-right font-bold ${style.text}`}>

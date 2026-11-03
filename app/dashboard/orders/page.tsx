@@ -6,6 +6,7 @@ import { getDateBounds } from '@/lib/date-range'
 import { ShoppingBag } from 'lucide-react'
 import { StatusFilter } from './StatusFilter'
 import { OrdersTable } from './OrdersTable'
+import { resolveOrderScheduledAt } from '@/lib/orders/scheduled'
 
 export default async function OrdersPage({
   searchParams,
@@ -17,7 +18,7 @@ export default async function OrdersPage({
 
   let query = supabase
     .from('orders')
-    .select('id, order_number, customer_name, customer_phone, customer_city, total, markets(currency), status, created_at')
+    .select('*, markets(currency)')
     .eq('store_id', store.id)
     .order('created_at', { ascending: false })
 
@@ -27,7 +28,31 @@ export default async function OrdersPage({
   query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString())
 
   const { data } = await query
-  const orders = (data ?? []) as any[]
+  const rawOrders = (data ?? []) as any[]
+
+  // Enrich scheduled orders with their scheduled_at timestamp (from column or order_events)
+  const scheduledIds = rawOrders.filter((o) => o.status === 'scheduled').map((o) => o.id)
+  const eventsByOrder = new Map<string, any[]>()
+  if (scheduledIds.length > 0) {
+    const { data: schedEvents } = await supabase
+      .from('order_events')
+      .select('order_id, event_type, note, created_at')
+      .in('order_id', scheduledIds)
+      .eq('event_type', 'Statut : Programmée')
+      .order('created_at', { ascending: false })
+
+    for (const ev of schedEvents ?? []) {
+      const list = eventsByOrder.get(ev.order_id) ?? []
+      list.push(ev)
+      eventsByOrder.set(ev.order_id, list)
+    }
+  }
+
+  const orders = rawOrders.map((o) => {
+    if (o.status !== 'scheduled') return o
+    const { scheduledAt } = resolveOrderScheduledAt(o, eventsByOrder.get(o.id))
+    return { ...o, scheduled_at: scheduledAt }
+  })
 
   return (
     <>

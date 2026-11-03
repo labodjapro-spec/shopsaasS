@@ -19,6 +19,7 @@ Pourquoi : la fonction qui envoie les notifications Push a été mise à jour (v
 - Dans **SQL Editor**, vérifie que tu as bien exécuté :
   1. `supabase/migrations/0014_web_push_subscriptions.sql`
   2. `supabase/migrations/0020_push_one_device.sql`
+  3. `supabase/migrations/0022_scheduled_orders.sql` (colonnes `scheduled_at` et `reminder_sent_at` pour les commandes programmées — noter que la programmation fonctionne déjà même avant d'exécuter ce fichier !)
 - Dans **Edge Functions → Secrets**, vérifie que ces 3 secrets existent bien (avec les valeurs de ton fichier `PUSH-VALUES.txt`) :
   - `PUSH_HOOK_SECRET` (doit être **exactement le même** que dans Vercel → Settings → Environment Variables)
   - `VAPID_KEYS_JSON`

@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { requirePerm } from '@/lib/context'
-import { Badge, Card, PageHeader } from '@/components/ui'
+import { Card } from '@/components/ui'
 import { formatMoney } from '@/lib/utils'
-import { updateOrderStatus, saveOrderNote } from '../actions'
+import { saveOrderNote } from '../actions'
+import StatusButtons from './StatusButtons'
+import { formatScheduledDateFr, parseScheduleNote, resolveOrderScheduledAt } from '@/lib/orders/scheduled'
 import { ArrowLeft, Phone, MapPin, User, Package, Clock, CheckCircle, XCircle, Truck, RotateCcw, AlertCircle } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -51,6 +53,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const currency = order.markets?.currency ?? 'XOF'
   const style = STATUS_STYLES[order.status] ?? STATUS_STYLES.new
   const StatusIcon = style.icon
+  const { scheduledAt, cleanNote } = resolveOrderScheduledAt(order, events)
+  const scheduledLabel = scheduledAt ? formatScheduledDateFr(scheduledAt) : ''
 
   return (
     <>
@@ -74,7 +78,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </div>
         <div className={`flex items-center gap-2 rounded-xl px-4 py-2 font-semibold text-sm ${style.bg} ${style.text}`}>
           <StatusIcon className="size-4" />
-          {STATUS_LABELS[order.status] ?? order.status}
+          <span>
+            {STATUS_LABELS[order.status] ?? order.status}
+            {order.status === 'scheduled' && scheduledLabel ? ` · ${scheduledLabel}` : ''}
+          </span>
         </div>
       </div>
 
@@ -162,53 +169,19 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
         {/* Colonne latérale */}
         <div className="space-y-5">
-          {/* Changer le statut */}
+          {/* Changer le statut + programmation */}
           <Card>
             <h2 className="font-semibold text-zinc-900 mb-4">Modifier le statut</h2>
-            <form
-              action={async (fd: FormData) => {
-                'use server'
-                await updateOrderStatus(id, String(fd.get('status')), String(fd.get('note') ?? ''))
-              }}
-              className="space-y-4"
-            >
-              {/* Boutons de statut colorés */}
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { key: 'new',         label: 'Nouvelle',     color: 'bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-200' },
-                  { key: 'confirmed',   label: 'Confirmée',    color: 'bg-emerald-600 hover:bg-emerald-700' },
-                  { key: 'unreachable', label: 'Injoignable',  color: 'bg-orange-500 hover:bg-orange-600' },
-                  { key: 'scheduled',   label: 'Programmée',   color: 'bg-blue-600 hover:bg-blue-700' },
-                  { key: 'shipped',     label: 'Expédiée',     color: 'bg-amber-500 hover:bg-amber-600' },
-                  { key: 'delivered',   label: 'Livrée',       color: 'bg-green-600 hover:bg-green-700' },
-                  { key: 'cancelled',   label: 'Annulée',      color: 'bg-red-600 hover:bg-red-700' },
-                  { key: 'returned',    label: 'Retournée',    color: 'bg-zinc-500 hover:bg-zinc-600' },
-                ].map(({ key, label, color }) => (
-                  <button
-                    key={key}
-                    type="submit"
-                    name="status"
-                    value={key}
-                    className={`
-                      relative rounded-xl px-3 py-2.5 text-xs font-bold transition-all
-                      ${color}
-                      ${order.status === key ? 'ring-2 ring-offset-2 ring-zinc-800 scale-[1.03]' : 'opacity-80 hover:opacity-100'}
-                    `}
-                  >
-                    {label}
-                    {order.status === key && (
-                      <span className="absolute -top-1 -right-1 size-3 rounded-full bg-white border-2 border-zinc-800" />
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              <input type="hidden" name="note" value="" />
-
-              <p className="text-xs text-zinc-400">
-                Cliquez sur un statut pour l&apos;appliquer. Vous serez redirigé vers la liste.
-              </p>
-            </form>
+            <StatusButtons
+              orderId={order.id}
+              orderNumber={order.order_number}
+              customerName={order.customer_name}
+              customerLocation={[order.customer_city, order.customer_address].filter(Boolean).join(' · ')}
+              amountText={formatMoney(order.total, currency)}
+              currentStatus={order.status}
+              currentScheduledAt={scheduledAt}
+              currentScheduleNote={cleanNote}
+            />
           </Card>
 
           {/* Historique */}
@@ -218,24 +191,33 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <p className="text-sm text-zinc-400 text-center py-4">Aucun événement enregistré</p>
             ) : (
               <div className="space-y-3">
-                {(events ?? []).map((event: any, i: number) => (
-                  <div key={i} className="flex gap-3">
-                    <div className="mt-1.5 size-2 rounded-full bg-violet-400 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-zinc-800">{event.event_type}</p>
-                      {event.note && (
-                        <p className="text-xs text-zinc-500 mt-0.5 bg-zinc-50 rounded-lg px-2 py-1">
-                          {event.note}
+                {(events ?? []).map((event: any, i: number) => {
+                  const parsedEv = parseScheduleNote(event.note)
+                  const evScheduleLabel = parsedEv.scheduledAt ? formatScheduledDateFr(parsedEv.scheduledAt) : ''
+                  return (
+                    <div key={i} className="flex gap-3">
+                      <div className="mt-1.5 size-2 rounded-full bg-violet-400 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-zinc-800">{event.event_type}</p>
+                        {evScheduleLabel && (
+                          <p className="mt-0.5 rounded-lg bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800">
+                            📅 Livraison prévue : {evScheduleLabel}
+                          </p>
+                        )}
+                        {parsedEv.cleanNote && (
+                          <p className="text-xs text-zinc-500 mt-0.5 bg-zinc-50 rounded-lg px-2 py-1">
+                            {parsedEv.cleanNote}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-zinc-400 mt-0.5">
+                          {new Date(event.created_at).toLocaleString('fr-FR', {
+                            day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+                          })}
                         </p>
-                      )}
-                      <p className="text-[11px] text-zinc-400 mt-0.5">
-                        {new Date(event.created_at).toLocaleString('fr-FR', {
-                          day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'
-                        })}
-                      </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </Card>

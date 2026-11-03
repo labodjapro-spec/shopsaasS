@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import * as webpush from 'jsr:@negrel/webpush@0.5.0'
 
 // Version visible in the diagnostic so you can check that Supabase runs the latest code.
-const FUNCTION_VERSION = 'push-order v2'
+const FUNCTION_VERSION = 'push-order v2.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -176,23 +176,27 @@ Deno.serve(async (request) => {
     })
   }
 
-  // ── Normal mode: a new order was created ───────────────────────────────
+  // ── Normal mode or Scheduled Reminder mode ─────────────────────────────
   const storeId = typeof body?.storeId === 'string' ? body.storeId : ''
   const orderId = typeof body?.orderId === 'string' ? body.orderId : ''
+  const isReminder = body?.kind === 'scheduled_reminder'
+  const extraNote = typeof body?.note === 'string' ? body.note.trim() : ''
   if (!storeId || !orderId) return json({ error: 'storeId and orderId are required.' }, 400)
 
-  const { error: dispatchError } = await supabase
-    .from('order_push_dispatches')
-    .insert({ order_id: orderId })
-  if (dispatchError) {
-    if (dispatchError.code === '23505') return json({ sent: 0, skipped: true })
-    console.warn('[push-order] dispatch lock failed:', dispatchError.message)
+  if (!isReminder) {
+    const { error: dispatchError } = await supabase
+      .from('order_push_dispatches')
+      .insert({ order_id: orderId })
+    if (dispatchError) {
+      if (dispatchError.code === '23505') return json({ sent: 0, skipped: true })
+      console.warn('[push-order] dispatch lock failed:', dispatchError.message)
+    }
   }
 
   const [{ data: order, error: orderError }, { data: store }, { data: members, error: memberError }] = await Promise.all([
     supabase
       .from('orders')
-      .select('id, store_id, order_number, total, customer_name, markets(currency)')
+      .select('id, store_id, order_number, total, customer_name, customer_city, customer_address, markets(currency)')
       .eq('id', orderId)
       .eq('store_id', storeId)
       .maybeSingle(),
@@ -209,7 +213,9 @@ Deno.serve(async (request) => {
   const memberUserIds = (members ?? []).flatMap((member: any) => {
     const role = Array.isArray(member.roles) ? member.roles[0] : member.roles
     const permissions = Array.isArray(role?.permissions) ? role.permissions : []
-    return permissions.includes('*') || permissions.includes('orders.read') ? [member.user_id] : []
+    return permissions.includes('*') || permissions.includes('orders.read') || permissions.includes('orders.ship')
+      ? [member.user_id]
+      : []
   })
   const eligibleUserIds = [...new Set([
     ...memberUserIds,
@@ -230,25 +236,46 @@ Deno.serve(async (request) => {
   const storeName = String(store?.name ?? 'Boutique')
   const customer = String(order.customer_name || 'Client').trim()
   const amount = `${total.toLocaleString('fr-FR')} ${currency}`.trim()
-  const payload = JSON.stringify({
-    title: 'Nouvelle commande',
-    body: `${customer}\n${order.order_number} · ${amount}\n${storeName}`,
-    url: `/dashboard/orders/${order.id}`,
-    tag: `order-${order.id}`,
-    orderId: order.id,
-    customer,
-    orderNumber: order.order_number,
-    amount,
-    currency,
-    storeName,
-    total,
-  })
+  const locationText = [order.customer_city, order.customer_address].filter(Boolean).join(' · ')
 
+  const payload = JSON.stringify(
+    isReminder
+      ? {
+          title: '🚚 Livraison programmée maintenant !',
+          body: `${customer} · ${order.order_number} (${amount})\n${locationText ? `📍 ${locationText}\n` : ''}${extraNote ? `📝 ${extraNote}` : storeName}`.trim(),
+          url: `/dashboard/orders/${order.id}`,
+          tag: `delivery-reminder-${order.id}`,
+          orderId: order.id,
+          customer,
+          orderNumber: order.order_number,
+          amount,
+          currency,
+          storeName,
+          total,
+          reminder: true,
+          note: extraNote,
+        }
+      : {
+          title: 'Nouvelle commande',
+          body: `${customer}\n${order.order_number} · ${amount}\n${storeName}`,
+          url: `/dashboard/orders/${order.id}`,
+          tag: `order-${order.id}`,
+          orderId: order.id,
+          customer,
+          orderNumber: order.order_number,
+          amount,
+          currency,
+          storeName,
+          total,
+        },
+  )
+
+  const topic = (isReminder ? `rem-${order.id}` : `order-${order.id}`).slice(0, 32)
   const { results, expiredIds } = await sendToAll(
     applicationServer,
     limitDevices(subscriptions as SubscriptionRow[]),
     payload,
-    `order-${order.id}`.slice(0, 32),
+    topic,
   )
   if (expiredIds.length) await supabase.from('web_push_subscriptions').delete().in('id', expiredIds)
 
