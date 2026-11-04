@@ -1,4 +1,4 @@
-/* ShopSaaS merchant app — v8 */
+/* ShopSaaS merchant app — v9 */
 const scheduledTimers = new Map()
 
 self.addEventListener('install', (event) => {
@@ -118,6 +118,11 @@ async function handlePush(event) {
   if (!payload.test) {
     windows.filter(isMerchantClient).forEach((client) => client.postMessage(message))
   }
+
+  // Ne pas afficher la notification système si l'app TWA est au premier plan
+  // (évite la double notification : TWA reçoit le postMessage, Chrome affiche la notif)
+  const twaActive = windows.some((client) => isMerchantClient(client) && client.focused)
+  if (twaActive && !payload.test) return
 
   // Always display the system notification: on Android/Windows, a tab can still
   // report focused=true when the phone screen just locked or another window is

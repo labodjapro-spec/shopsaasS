@@ -82,6 +82,22 @@ function MonthGrid({
   )
 }
 
+const STORAGE_KEY = 'shopsaas-daterange'
+
+function saveRange(range: string, from?: string, to?: string) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ range, from: from ?? '', to: to ?? '' }))
+  } catch { /* silencieux */ }
+}
+
+function loadRange() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as { range: string; from: string; to: string }
+  } catch { return null }
+}
+
 export function DateRange({ compact = false, align = 'right' }: { compact?: boolean; align?: 'left' | 'right' }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -89,6 +105,19 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
   const fromParam = params.get('from') ?? ''
   const toParam = params.get('to') ?? ''
   const [open, setOpen] = useState(false)
+
+  // Au premier montage : si l'URL n'a pas de range, restaurer depuis localStorage
+  useEffect(() => {
+    if (params.get('range')) return // déjà dans l'URL, ne rien faire
+    const saved = loadRange()
+    if (!saved || saved.range === '7d') return // valeur par défaut, pas besoin de naviguer
+    const next = new URLSearchParams(params.toString())
+    next.set('range', saved.range)
+    if (saved.from) next.set('from', saved.from)
+    if (saved.to) next.set('to', saved.to)
+    router.replace(`?${next.toString()}`)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [hovering, setHovering] = useState('')
   const [mobile, setMobile] = useState(false)
   const [draftFrom, setDraftFrom] = useState(fromParam)
@@ -131,6 +160,7 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
     next.set('range', range)
     next.delete('from')
     next.delete('to')
+    saveRange(range)
     pushParams(next)
     setOpen(false)
   }
@@ -156,6 +186,7 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
     next.set('from', draftFrom)
     if (draftTo) next.set('to', draftTo)
     else next.delete('to')
+    saveRange('custom', draftFrom, draftTo || undefined)
     pushParams(next)
     setOpen(false)
   }
