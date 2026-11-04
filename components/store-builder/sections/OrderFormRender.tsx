@@ -218,7 +218,7 @@ const btnAnimation: BtnAnimation = formSettings.btn_animation || 'pulse'
         className="fixed inset-0 z-[2147483000] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
         style={{ background: 'rgba(10, 15, 40, 0.65)', backdropFilter: 'blur(10px)' }}
       >
-        <div className="bg-white w-full sm:max-w-[480px] sm:rounded-[28px] rounded-t-[28px] shadow-2xl relative overflow-hidden anim-pop border border-white/20">
+        <div className="bg-white w-full sm:max-w-[480px] sm:rounded-[28px] rounded-t-[28px] shadow-2xl relative overflow-hidden anim-pop border border-white/20 max-h-[92dvh] overflow-y-auto">
 
           {/* ── Bande de succès gradient ── */}
           <div className="relative bg-gradient-to-br from-[#6d28d9] via-[#7c3aed] to-[#4f46e5] px-6 pt-8 pb-10 text-center overflow-hidden">
@@ -291,7 +291,7 @@ const btnAnimation: BtnAnimation = formSettings.btn_animation || 'pulse'
 
             {/* Récap produit */}
             <div className="rounded-2xl border border-zinc-100 bg-white shadow-sm overflow-hidden">
-              <div className="flex items-center gap-3 p-3.5">
+              <div className="flex items-start gap-3 p-3.5">
                 {productImage && (
                   <img src={productImage} alt={product?.title || ''} className="w-14 h-14 rounded-xl object-cover border border-zinc-100 shrink-0" />
                 )}
@@ -300,12 +300,12 @@ const btnAnimation: BtnAnimation = formSettings.btn_animation || 'pulse'
                     {product?.title || 'Votre produit'}
                   </p>
                   <p className="text-xs text-zinc-400 mt-1">Quantité : {finalQty}</p>
+                  {displayTotal && (
+                    <p className="font-black text-violet-700 text-base mt-1">{displayTotal}</p>
+                  )}
                 </div>
-                {displayTotal && (
-                  <p className="font-black text-violet-700 text-sm shrink-0">{displayTotal}</p>
-                )}
               </div>
-              <div className="bg-violet-50 border-t border-violet-100 px-4 py-2.5 flex justify-between items-center">
+              <div className="bg-violet-50 border-t border-violet-100 px-4 py-2.5 flex flex-wrap justify-between items-center gap-1">
                 <span className="text-xs font-semibold text-zinc-500">Paiement</span>
                 <span className="text-xs font-black text-emerald-600">💵 À la livraison</span>
               </div>
