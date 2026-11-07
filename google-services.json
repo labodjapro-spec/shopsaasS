@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "634423454909",
+    "project_id": "shopsa-f92d6",
+    "storage_bucket": "shopsa-f92d6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:634423454909:android:97ed405617246e7987dbd4",
+        "android_client_info": {
+          "package_name": "com.shopsa.dashboard"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCY54CkTXTvNqpOtJpbveWQyWlRHXYCum4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

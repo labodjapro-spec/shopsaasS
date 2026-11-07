@@ -1,0 +1,14 @@
+{
+  "appId": "com.shopsa.dashboard",
+  "appName": "ShopSa",
+  "webDir": "out",
+  "server": {
+    "url": "https://shopsa-b7sgv.vercel.app",
+    "cleartext": true
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

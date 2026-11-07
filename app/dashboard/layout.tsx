@@ -5,6 +5,7 @@ import { logout } from '@/app/(auth)/actions'
 import { Sidebar, type NavItem } from './Sidebar'
 import { StoreSwitcher } from './StoreSwitcher'
 import OrderNotification from '@/components/dashboard/OrderNotification'
+import FCMInitializer from '@/components/dashboard/FCMInitializer'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, memberships, current, store, permissions } = await requireStore()
@@ -56,6 +57,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       {can(permissions, 'orders.read') && (
         <OrderNotification storeIds={(switcherStores.length ? switcherStores : [{ id: store.id }]).map(item => item.id)} />
       )}
+      {/* Initialise les notifications FCM dans l'APK Android */}
+      <FCMInitializer />
     </div>
   )
 }

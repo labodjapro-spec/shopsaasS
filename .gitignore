@@ -8,3 +8,8 @@ PUSH-VALUES.txt
 .vscode
 supabase/.temp
 supabase/functions/push-order/.env
+# Firebase service account (NE PAS COMMITTER)
+firebase-service-account.json
+*.keystore
+*.jks
+

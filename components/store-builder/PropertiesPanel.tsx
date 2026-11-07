@@ -1038,4 +1038,26 @@ function VariantOptionsEditor({ value, onChange }: { value: { name: string; valu
             className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg mb-2 focus:outline-none focus:border-blue-400"
           />
           <label className="text-[9px] font-semibold text-gray-400 uppercase block mb-1">Valeurs</label>
-          {group.values.map((val,
+          {group.values.map((val, vi) => (
+            <div key={vi} className="flex items-center gap-1 mb-1">
+              <input
+                type="text"
+                value={val}
+                onChange={e => updateValue(gi, vi, e.target.value)}
+                placeholder="Ex: S, M, Rouge, Vanille…"
+                className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
+              />
+              {group.values.length > 1 && (
+                <button type="button" onClick={() => removeValue(gi, vi)} className="text-gray-300 hover:text-red-400 text-xs px-1">✕</button>
+              )}
+            </div>
+          ))}
+          <button type="button" onClick={() => addValue(gi)} className="text-[10px] font-semibold text-blue-500 hover:text-blue-700 mt-1">+ Ajouter une valeur</button>
+        </div>
+      ))}
+      <button type="button" onClick={add} className="w-full py-2 text-xs font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg border border-dashed border-gray-300">+ Ajouter un groupe de variantes</button>
+    </div>
+  )
+}
+
+
