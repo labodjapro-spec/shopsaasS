@@ -307,7 +307,25 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
   useEffect(() => {
     if (!storeIds.length) return
 
-    const checkReminders = async () => {
+    // Récupérer les commandes manquées des dernières 24h au montage
+    const fetchMissed = async () => {
+      try {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        const response = await fetch(`/api/orders/poll?store_ids=${encodeURIComponent(storeIds.join(','))}&since=${encodeURIComponent(since)}`)
+        const data = await response.json().catch(() => ({ orders: [] }))
+        let missedCount = 0
+        for (const order of data.orders ?? []) {
+          if (!knownIds.current.has(order.id)) {
+            missedCount++
+            handleNewOrder(order)
+          }
+        }
+        if (missedCount > 0) {
+          console.log(`[OrderNotification] ${missedCount} commande(s) manquée(s) récupérée(s)`)
+        }
+      } catch { /* silencieux */ }
+    }
+    void fetchMissed()
       try {
         const res = await fetch(`/api/orders/reminders?store_ids=${encodeURIComponent(storeIds.join(','))}`)
         const data = await res.json().catch(() => ({ dueReminders: [], upcoming: [] }))
