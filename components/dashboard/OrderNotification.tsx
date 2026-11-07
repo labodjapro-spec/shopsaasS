@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
@@ -206,6 +206,11 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
 
   useEffect(() => {
     let active = true
+    // Dans Capacitor (APK Android), FCM gère les notifications — pas le Web Push
+    if (typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform?.()) {
+      setPushEnabled(true) // considéré comme activé via FCM
+      return
+    }
     setPushEnabled(isPushFlagEnabled())
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
       setPushEnabled(false)
@@ -386,6 +391,11 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
   }, [handleNewOrder, handleDeliveryReminder])
 
   const enablePush = async () => {
+    // Dans Capacitor, FCM est déjà actif — pas besoin du Web Push
+    if (typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform?.()) {
+      toast.success('Les notifications sont déjà actives sur cet appareil via FCM.')
+      return
+    }
     if (isIosDevice() && !isStandaloneDisplay()) {
       toast('Sur iPhone/iPad, installe d’abord ShopSaaS sur l’écran d’accueil, puis ouvre l’icône pour activer les alertes.', { duration: 7000 })
       return
