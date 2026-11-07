@@ -1,8 +1,21 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
+﻿import { createClient } from 'npm:@supabase/supabase-js@2'
 import * as webpush from 'jsr:@negrel/webpush@0.5.0'
 
 // Version visible in the diagnostic so you can check that Supabase runs the latest code.
-const FUNCTION_VERSION = 'push-order v3.0-fcm'
+/** Encode en base64url (sans padding, avec -/_ au lieu de +/) — requis pour les JWT */
+function base64url(input: string | Uint8Array): string {
+  let b64: string
+  if (typeof input === 'string') {
+    b64 = btoa(input)
+  } else {
+    let binary = ''
+    input.forEach((byte: number) => { binary += String.fromCharCode(byte) })
+    b64 = btoa(binary)
+  }
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+const FUNCTION_VERSION = 'push-order v3.1-fcm-fix'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -107,8 +120,8 @@ async function sendFCM(
     // Obtenir un access token OAuth2 depuis le service account
     const serviceAccount = JSON.parse(fcmServiceAccountJson)
     const now = Math.floor(Date.now() / 1000)
-    const header = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
-    const claimSet = btoa(JSON.stringify({
+    const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
+    const claimSet = base64url(JSON.stringify({
       iss: serviceAccount.client_email,
       scope: 'https://www.googleapis.com/auth/firebase.messaging',
       aud: 'https://oauth2.googleapis.com/token',
@@ -136,7 +149,7 @@ async function sendFCM(
       cryptoKey,
       new TextEncoder().encode(signingInput),
     )
-    const jwt = `${signingInput}.${btoa(String.fromCharCode(...new Uint8Array(signature)))}`
+    const jwt = `${signingInput}.${base64url(new Uint8Array(signature))}`
 
     // Échange le JWT contre un access token
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
