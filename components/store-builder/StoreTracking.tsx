@@ -2,7 +2,9 @@
 
 import Script from 'next/script'
 
-/** Meta (Facebook) Pixel — PageView + événements e-commerce sur la boutique publique */
+/** Meta (Facebook) Pixel — PageView + événements e-commerce sur la boutique publique.
+ *  Note : ce composant est utilisé sur les pages builder (PublicPageRenderer).
+ *  Les pages /s/[store]/p/[slug] utilisent MetaPixelTracker à la place. */
 export default function StoreTracking({ pixelId }: { pixelId?: string | null }) {
   const id = pixelId?.trim()
   if (!id) return null
@@ -19,7 +21,7 @@ export default function StoreTracking({ pixelId }: { pixelId?: string | null }) 
         s.parentNode.insertBefore(t,s)}(window, document,'script',
         'https://connect.facebook.net/en_US/fbevents.js');
         fbq('init', '${id}');
-        fbq('track', 'PageView');
+        fbq('trackSingle', '${id}', 'PageView');
       `}</Script>
       <noscript>
         <img

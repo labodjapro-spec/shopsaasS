@@ -3,21 +3,27 @@ import { createClient } from '@/lib/supabase/server'
 import PublicPageRenderer from './PublicPageRenderer'
 import MetaPixelTracker from './p/[slug]/MetaPixelTracker'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { unstable_cache } from 'next/cache'
 
-async function loadMetaPixelId(storeId: string) {
-  try {
-    const admin = createAdminClient()
-    const { data } = await admin
-      .from('store_meta_integrations')
-      .select('pixel_id')
-      .eq('store_id', storeId)
-      .maybeSingle()
-    return data?.pixel_id || ''
-  } catch (error) {
-    console.error('[storefront/meta] Pixel settings unavailable:', error instanceof Error ? error.message : 'unknown error')
-    return ''
-  }
-}
+// ── Charge le Pixel ID depuis le cache (60s) ───────────────────────────────
+const loadMetaPixelId = unstable_cache(
+  async (storeId: string) => {
+    try {
+      const admin = createAdminClient()
+      const { data } = await admin
+        .from('store_meta_integrations')
+        .select('pixel_id')
+        .eq('store_id', storeId)
+        .maybeSingle()
+      return data?.pixel_id || ''
+    } catch (error) {
+      console.error('[storefront/meta] Pixel settings unavailable:', error instanceof Error ? error.message : 'unknown error')
+      return ''
+    }
+  },
+  ['meta-pixel-id'],
+  { revalidate: 60, tags: ['meta-pixel'] }
+)
 
 export default async function StorePublicPage({ params }: { params: Promise<{ store: string }> }) {
   const { store: slug } = await params
@@ -42,22 +48,28 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
 
     const parentStore = directPage.stores as any
 
-    // Récupérer marché + produits du store parent
-    const { data: mkt } = await supabase
-      .from('markets').select('id, currency, name, shipping_fee')
-      .eq('store_id', parentStore.id).eq('is_default', true).maybeSingle()
-    const { data: anyMkt } = !mkt
-      ? await supabase.from('markets').select('id, currency, name, shipping_fee')
-          .eq('store_id', parentStore.id).limit(1).maybeSingle()
-      : { data: null }
-    const market = mkt ?? anyMkt
+    // ── Marché + produits en parallèle ────────────────────────────────────
+    const [{ data: mkt }, { data: rawProds }] = await Promise.all([
+      supabase
+        .from('markets').select('id, currency, name, shipping_fee')
+        .eq('store_id', parentStore.id).eq('is_default', true).maybeSingle(),
+      supabase
+        .from('products')
+        .select('id, title, images, description, status, variants(id, variant_prices(market_id, price, compare_at_price))')
+        .eq('store_id', parentStore.id).eq('status', 'active').order('created_at', { ascending: false }),
+    ])
+
+    // Fallback marché si pas de default
+    let market: any = mkt
+    if (!market) {
+      const { data: anyMkt } = await supabase
+        .from('markets').select('id, currency, name, shipping_fee')
+        .eq('store_id', parentStore.id).limit(1).maybeSingle()
+      market = anyMkt
+    }
+
     const marketId = market?.id ?? null
     const currency = market?.currency ?? 'XOF'
-
-    const { data: rawProds } = await supabase
-      .from('products')
-      .select('id, title, images, description, status, variants(id, variant_prices(market_id, price, compare_at_price))')
-      .eq('store_id', parentStore.id).eq('status', 'active').order('created_at', { ascending: false })
 
     const products = (rawProds ?? []).map((p: any) => {
       const allPrices = (p.variants ?? []).flatMap((v: any) => v.variant_prices ?? [])
@@ -73,7 +85,7 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
       themeSettings: {
         ...(directPage.builder_json?.themeSettings ?? {}),
         currency, market_id: marketId,
-        store_id: parentStore.id, // commandes vers la boutique parente
+        store_id: parentStore.id,
         api_base: apiBase2,
         shipping_fee: market?.shipping_fee ?? 0,
       },
@@ -99,13 +111,37 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
 
   if (!store) notFound()
 
-  // ── Page builder ─────────────────────────────────────────────────────────
-  const { data: storePage } = await supabase
-    .from('store_pages')
-    .select('builder_json, is_published')
-    .eq('store_id', store.id)
-    .eq('slug', 'home')
-    .maybeSingle()
+  // ── Page builder + marché + produits + pixel en parallèle ───────────────
+  const rootDomain = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000').trim()
+  const isLocal = rootDomain.startsWith('localhost')
+  const apiBase = isLocal ? `http://${rootDomain}` : ''
+
+  const [
+    { data: storePage },
+    { data: defaultMarket },
+    { data: rawProducts },
+    pixelId,
+  ] = await Promise.all([
+    supabase
+      .from('store_pages')
+      .select('builder_json, is_published')
+      .eq('store_id', store.id)
+      .eq('slug', 'home')
+      .maybeSingle(),
+    supabase
+      .from('markets')
+      .select('id, currency, name, shipping_fee')
+      .eq('store_id', store.id)
+      .eq('is_default', true)
+      .maybeSingle(),
+    supabase
+      .from('products')
+      .select('id, title, images, description, status, variants(id, variant_prices(market_id, price, compare_at_price))')
+      .eq('store_id', store.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false }),
+    loadMetaPixelId(store.id),
+  ])
 
   if (!storePage?.builder_json) {
     return (
@@ -115,34 +151,20 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
     )
   }
 
-  // ── Marché par défaut (devise + id pour les prix) ────────────────────────
-  const { data: defaultMarket } = await supabase
-    .from('markets')
-    .select('id, currency, name, shipping_fee')
-    .eq('store_id', store.id)
-    .eq('is_default', true)
-    .maybeSingle()
+  // ── Fallback marché si pas de default ────────────────────────────────────
+  let market: any = defaultMarket
+  if (!market) {
+    const { data: anyMarket } = await supabase
+      .from('markets')
+      .select('id, currency, name, shipping_fee')
+      .eq('store_id', store.id)
+      .limit(1)
+      .maybeSingle()
+    market = anyMarket
+  }
 
-  const { data: anyMarket } = !defaultMarket
-    ? await supabase
-        .from('markets')
-        .select('id, currency, name, shipping_fee')
-        .eq('store_id', store.id)
-        .limit(1)
-        .maybeSingle()
-    : { data: null }
-
-  const market = defaultMarket ?? anyMarket
   const marketId = market?.id ?? null
   const currency = market?.currency ?? 'XOF'
-
-  // ── Produits de cette boutique uniquement ───────────────────────────────
-  const { data: rawProducts } = await supabase
-    .from('products')
-    .select('id, title, images, description, status, variants(id, variant_prices(market_id, price, compare_at_price))')
-    .eq('store_id', store.id)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
 
   const products = (rawProducts ?? []).map((p: any) => {
     const allPrices = (p.variants ?? []).flatMap((v: any) => v.variant_prices ?? [])
@@ -157,11 +179,6 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
     }
   })
 
-  // ── api_base : vide en production (même domaine), localhost en dev ────────
-  const rootDomain = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000').trim()
-  const isLocal = rootDomain.startsWith('localhost')
-  const apiBase = isLocal ? `http://${rootDomain}` : ''
-
   const builderJson = {
     ...storePage.builder_json,
     themeSettings: {
@@ -169,12 +186,11 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
       currency,
       market_id: marketId,
       shipping_fee: market?.shipping_fee ?? 0,
-      store_id: store.id, // fallback au cas où le prop storeId ne serait pas transmis
+      store_id: store.id,
       api_base: apiBase,
     },
   }
   const selectedProduct = products.find((item: any) => item.id === builderJson?.selectedProductId) ?? products[0]
-  const pixelId = await loadMetaPixelId(store.id)
 
   return (
     <>

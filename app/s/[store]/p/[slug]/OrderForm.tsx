@@ -101,20 +101,24 @@ export function OrderForm({ storeId, marketId, currency, shipping, price, stock,
   }
   if (orderNumber && typeof document !== 'undefined') {
     return createPortal(
-      <div className="fixed inset-0 z-[2147483000] flex items-end justify-center overflow-y-auto bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4" style={{ minHeight: '100dvh' }}>
-        <section role="dialog" aria-modal="true" aria-labelledby="product-order-success" className="max-h-[100dvh] w-full overflow-y-auto rounded-t-[28px] bg-white p-6 shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[460px] sm:rounded-[28px]">
-          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-700" aria-hidden="true">✓</div>
-          <h2 id="product-order-success" className="text-center text-2xl font-black text-zinc-900">Commande reçue !</h2>
-          <p className="mt-2 text-center text-sm leading-6 text-zinc-600">Merci {confirmedName.trim().split(/\s+/)[0]}. Ta commande est enregistrée. Garde ton téléphone disponible, notre équipe va t’appeler pour confirmer la livraison.</p>
-          <div className="mt-5 rounded-xl bg-zinc-50 p-4 text-sm">
-            <p className="font-bold text-zinc-800">{productName}</p>
-            <p className="mt-1 text-zinc-600">{offer} × {price.toLocaleString('fr-FR')} {currency} · livraison {shipping.toLocaleString('fr-FR')} {currency}</p>
-            <p className="mt-2 font-black text-violet-800">Total : {total.toLocaleString('fr-FR')} {currency}</p>
-            <p className="mt-2 break-all text-xs text-zinc-500">Référence : {orderNumber}</p>
+      <div className="fixed inset-0 z-[2147483000] flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4" style={{ minHeight: '100dvh' }} onClick={() => setOrderNumber('')}>
+        <section role="dialog" aria-modal="true" aria-labelledby="product-order-success" className="flex max-h-[100dvh] w-full flex-col rounded-t-[28px] bg-white shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[460px] sm:rounded-[28px]" onClick={e => e.stopPropagation()}>
+          <div className="flex-1 overflow-y-auto overscroll-contain p-5 pb-4">
+            <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full bg-emerald-100 text-2xl text-emerald-700" aria-hidden="true">✓</div>
+            <h2 id="product-order-success" className="text-center text-xl font-black text-zinc-900">Commande reçue ! 🎉</h2>
+            <p className="mt-1.5 text-center text-sm leading-5 text-zinc-600">Merci {confirmedName.trim().split(/\s+/)[0]}. Ta commande est enregistrée. Garde ton téléphone disponible, notre équipe va t&apos;appeler pour confirmer la livraison.</p>
+            <div className="mt-4 rounded-xl bg-zinc-50 p-3.5 text-sm">
+              <p className="font-bold text-zinc-800">{productName}</p>
+              <p className="mt-1 text-zinc-600">{offer} × {price.toLocaleString('fr-FR')} {currency} · livraison {shipping.toLocaleString('fr-FR')} {currency}</p>
+              <p className="mt-2 font-black text-violet-800">Total : {total.toLocaleString('fr-FR')} {currency}</p>
+              <p className="mt-2 break-all text-xs text-zinc-500">Référence : {orderNumber}</p>
+            </div>
           </div>
-          <button type="button" onClick={() => setOrderNumber('')} className="mt-5 w-full rounded-xl bg-violet-700 px-4 py-3 text-sm font-bold text-white hover:bg-violet-800">
-            Terminé
-          </button>
+          <div className="flex-shrink-0 px-5 pb-5">
+            <button type="button" onClick={() => setOrderNumber('')} className="w-full rounded-xl bg-violet-700 px-4 py-3 text-sm font-bold text-white hover:bg-violet-800">
+              Terminé
+            </button>
+          </div>
         </section>
       </div>,
       document.body,

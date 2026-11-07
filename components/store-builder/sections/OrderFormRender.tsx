@@ -215,111 +215,112 @@ const btnAnimation: BtnAnimation = formSettings.btn_animation || 'pulse'
 
     return typeof document !== 'undefined' ? createPortal(
       <div
-        className="fixed inset-0 z-[2147483000] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
-        style={{ background: 'rgba(10, 15, 40, 0.65)', backdropFilter: 'blur(10px)' }}
+        className="fixed inset-0 z-[2147483000] flex items-end sm:items-center justify-center overflow-y-auto overscroll-contain"
+        style={{ background: 'rgba(10, 15, 40, 0.65)', backdropFilter: 'blur(10px)', padding: '0 0 env(safe-area-inset-bottom, 0px) 0' }}
+        onClick={(e) => { if (e.target === e.currentTarget) { setSent(false); setName(''); setPhone(''); setCity(''); setEmail('') } }}
       >
-        <div className="bg-white w-full sm:max-w-[480px] sm:rounded-[28px] rounded-t-[28px] shadow-2xl relative overflow-hidden anim-pop border border-white/20 max-h-[92dvh] overflow-y-auto">
+        <div className="bg-white w-full sm:max-w-[460px] sm:rounded-[24px] rounded-t-[24px] shadow-2xl relative anim-pop border border-white/20 max-h-[100dvh] sm:max-h-[calc(100dvh-32px)] sm:my-4 flex flex-col">
 
-          {/* ── Bande de succès gradient ── */}
-          <div className="relative bg-gradient-to-br from-[#6d28d9] via-[#7c3aed] to-[#4f46e5] px-6 pt-8 pb-10 text-center overflow-hidden">
+          {/* ── Bande de succès gradient (compacte) ── */}
+          <div className="relative bg-gradient-to-br from-[#6d28d9] via-[#7c3aed] to-[#4f46e5] px-5 pt-5 pb-6 text-center overflow-hidden shrink-0 sm:rounded-t-[24px] rounded-t-[24px]">
             {/* Cercles décoratifs */}
-            <div className="absolute -top-8 -right-8 w-36 h-36 rounded-full bg-white/10" />
-            <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-white/5" />
+            <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-white/10" />
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 rounded-full bg-white/5" />
 
             {/* Bouton fermer */}
             <button
               onClick={() => { setSent(false); setName(''); setPhone(''); setCity(''); setEmail('') }}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors z-20 text-sm font-bold"
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors z-20 text-sm font-bold"
             >
               ✕
             </button>
 
-            {/* Icône check animée */}
-            <div className="relative z-10 w-20 h-20 mx-auto mb-4 bg-white rounded-full flex items-center justify-center shadow-xl shadow-violet-900/30">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            {/* Icône check */}
+            <div className="relative z-10 w-16 h-16 mx-auto mb-3 bg-white rounded-full flex items-center justify-center shadow-xl shadow-violet-900/30">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
 
-            <h3 className="relative z-10 text-2xl font-black text-white tracking-tight">
+            <h3 className="relative z-10 text-xl font-black text-white tracking-tight">
               Commande reçue ! 🎉
             </h3>
-            <p className="relative z-10 text-sm text-white/80 mt-1.5 font-medium">
+            <p className="relative z-10 text-sm text-white/80 mt-1 font-medium">
               Merci {name.split(' ')[0]}, tu seras appelé(e) très bientôt.
             </p>
           </div>
 
-          {/* ── Contenu principal ── */}
-          <div className="px-5 py-5 space-y-3">
+          {/* ── Contenu scrollable ── */}
+          <div className="px-4 py-4 space-y-2.5 overflow-y-auto overscroll-contain flex-1 min-h-0">
 
-            {/* Carte info client */}
-            <div className="rounded-2xl bg-violet-50 border border-violet-100 p-4 space-y-2.5">
-              <p className="text-[11px] font-bold text-violet-500 uppercase tracking-wider mb-3">Informations de livraison</p>
+            {/* Carte info client — compacte */}
+            <div className="rounded-xl bg-violet-50 border border-violet-100 p-3 space-y-2">
+              <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-1">Informations de livraison</p>
 
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-white border border-violet-100 flex items-center justify-center shrink-0 shadow-sm">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-white border border-violet-100 flex items-center justify-center shrink-0">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 </div>
-                <div>
-                  <p className="text-[10px] text-zinc-400 font-medium">Nom complet</p>
-                  <p className="text-sm font-bold text-zinc-800">{name}</p>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-zinc-400 font-medium leading-none">Nom</p>
+                  <p className="text-sm font-bold text-zinc-800 truncate">{name}</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-white border border-violet-100 flex items-center justify-center shrink-0 shadow-sm">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.61 4.37 2 2 0 0 1 3.58 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.29 6.29l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-white border border-violet-100 flex items-center justify-center shrink-0">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.61 4.37 2 2 0 0 1 3.58 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.29 6.29l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                 </div>
-                <div>
-                  <p className="text-[10px] text-zinc-400 font-medium">Téléphone</p>
-                  <p className="text-sm font-bold text-zinc-800">{phone}</p>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-zinc-400 font-medium leading-none">Téléphone</p>
+                  <p className="text-sm font-bold text-zinc-800 truncate">{phone}</p>
                 </div>
               </div>
 
               {city && (
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-white border border-violet-100 flex items-center justify-center shrink-0 shadow-sm">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-white border border-violet-100 flex items-center justify-center shrink-0">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   </div>
-                  <div>
-                    <p className="text-[10px] text-zinc-400 font-medium">Ville</p>
-                    <p className="text-sm font-bold text-zinc-800">{city}</p>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-zinc-400 font-medium leading-none">Ville</p>
+                    <p className="text-sm font-bold text-zinc-800 truncate">{city}</p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Récap produit */}
-            <div className="rounded-2xl border border-zinc-100 bg-white shadow-sm overflow-hidden">
-              <div className="flex items-start gap-3 p-3.5">
+            {/* Récap produit — compact */}
+            <div className="rounded-xl border border-zinc-100 bg-white shadow-sm overflow-hidden">
+              <div className="flex items-center gap-3 p-3">
                 {productImage && (
-                  <img src={productImage} alt={product?.title || ''} className="w-14 h-14 rounded-xl object-cover border border-zinc-100 shrink-0" />
+                  <img src={productImage} alt={product?.title || ''} className="w-12 h-12 rounded-lg object-cover border border-zinc-100 shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-zinc-800 text-sm leading-tight line-clamp-2">
+                  <p className="font-bold text-zinc-800 text-sm leading-tight truncate">
                     {product?.title || 'Votre produit'}
                   </p>
-                  <p className="text-xs text-zinc-400 mt-1">Quantité : {finalQty}</p>
+                  <p className="text-xs text-zinc-400">Quantité : {finalQty}</p>
                   {displayTotal && (
-                    <p className="font-black text-violet-700 text-base mt-1">{displayTotal}</p>
+                    <p className="font-black text-violet-700 text-sm">{displayTotal}</p>
                   )}
                 </div>
               </div>
-              <div className="bg-violet-50 border-t border-violet-100 px-4 py-2.5 flex flex-wrap justify-between items-center gap-1">
+              <div className="bg-violet-50 border-t border-violet-100 px-3 py-2 flex justify-between items-center">
                 <span className="text-xs font-semibold text-zinc-500">Paiement</span>
                 <span className="text-xs font-black text-emerald-600">💵 À la livraison</span>
               </div>
             </div>
 
-            {/* Bannière "on t'appelle" */}
-            <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-4 flex items-center gap-3 shadow-md shadow-emerald-200/50">
-              <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.61 4.37 2 2 0 0 1 3.58 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.29 6.29l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            {/* Bannière "on t'appelle" — compact */}
+            <div className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 p-3 flex items-center gap-2.5 shadow-md shadow-emerald-200/50">
+              <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.61 4.37 2 2 0 0 1 3.58 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.29 6.29l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
               </div>
               <div>
                 <p className="font-black text-white text-sm">Un agent va vous appeler</p>
                 <p className="text-white/85 text-xs mt-0.5 leading-snug">
-                  Restez disponible sur le <span className="font-bold">{phone}</span> pour confirmer votre commande.
+                  Restez disponible sur le <span className="font-bold">{phone}</span> pour confirmer.
                 </p>
               </div>
             </div>
@@ -330,9 +331,9 @@ const btnAnimation: BtnAnimation = formSettings.btn_animation || 'pulse'
                 href={waLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2.5 w-full rounded-2xl bg-[#25D366] hover:bg-[#1ebe5d] text-white font-black py-3.5 text-sm transition-all shadow-md shadow-green-200/50 active:scale-[0.98]"
+                className="flex items-center justify-center gap-2 w-full rounded-xl bg-[#25D366] hover:bg-[#1ebe5d] text-white font-black py-3 text-sm transition-all shadow-md shadow-green-200/50 active:scale-[0.98]"
               >
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 00-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 00-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                 Discuter sur WhatsApp
               </a>
             )}
