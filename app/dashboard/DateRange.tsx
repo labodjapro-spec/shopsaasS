@@ -5,16 +5,30 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react'
 
-const MONTHS_FR = ['Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre']
+const MONTHS_FR = ['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.']
+const MONTHS_FULL = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
 const DAYS_FR = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
 const PRESETS = [
   { label: "Aujourd'hui", value: 'today' },
   { label: 'Hier', value: 'yesterday' },
-  { label: '7 derniers jours', value: '7d' },
-  { label: '30 derniers jours', value: '30d' },
-  { label: 'Ce mois-ci', value: 'month' },
+  { label: '7 jours', value: '7d' },
+  { label: '30 jours', value: '30d' },
+  { label: 'Ce mois', value: 'month' },
   { label: 'Mois dernier', value: 'lastmonth' },
 ]
+
+const STORAGE_KEY = 'shopsaas-daterange'
+
+function saveRange(range: string, from?: string, to?: string) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ range, from: from ?? '', to: to ?? '' })) } catch { /* silent */ }
+}
+
+function loadRange() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) as { range: string; from: string; to: string } : null
+  } catch { return null }
+}
 
 function isoDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -25,15 +39,9 @@ function formatShort(value: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
 
-function MonthGrid({
-  month, from, to, hovering, onPick, onHover,
-}: {
-  month: Date
-  from: string
-  to: string
-  hovering: string
-  onPick: (v: string) => void
-  onHover: (v: string) => void
+function MonthGrid({ month, from, to, hovering, onPick, onHover }: {
+  month: Date; from: string; to: string; hovering: string
+  onPick: (v: string) => void; onHover: (v: string) => void
 }) {
   const year = month.getFullYear()
   const m = month.getMonth()
@@ -45,19 +53,14 @@ function MonthGrid({
   while (cells.length % 7 !== 0) cells.push(null)
 
   return (
-    <div className="w-full">
-      <p className="mb-3 text-center text-sm font-semibold text-zinc-800">
-        {MONTHS_FR[m]} {year}
-      </p>
-      <div className="grid grid-cols-7 gap-0.5 text-center">
-        {DAYS_FR.map(d => (
-          <span key={d} className="py-1 text-[11px] font-medium text-zinc-400">{d}</span>
-        ))}
+    <div className="w-full min-w-[260px]">
+      <p className="mb-2 text-center text-sm font-bold text-zinc-800">{MONTHS_FULL[m]} {year}</p>
+      <div className="grid grid-cols-7 gap-y-0.5 text-center">
+        {DAYS_FR.map(d => <span key={d} className="py-1 text-[11px] font-semibold text-zinc-400">{d}</span>)}
         {cells.map((v, i) => {
           if (!v) return <span key={`e-${i}`} />
           const isFrom = v === from
           const isTo = v === to
-          const isEndpoint = isFrom || isTo
           const effectiveTo = to || hovering
           const inRange = from && effectiveTo && v > from && v < effectiveTo
           return (
@@ -67,10 +70,8 @@ function MonthGrid({
               onClick={() => onPick(v)}
               onMouseEnter={() => onHover(v)}
               className={[
-                'h-11 text-sm font-semibold transition-colors',
-                isEndpoint ? 'bg-violet-600 text-white' : inRange ? 'bg-violet-100 text-violet-800' : 'text-zinc-700 hover:bg-violet-50',
-                isFrom && (to || hovering) ? 'rounded-l-full' : 'rounded-full',
-                isTo && from ? 'rounded-r-full' : '',
+                'h-9 w-full text-sm font-semibold transition-colors rounded-full',
+                isFrom || isTo ? 'bg-violet-600 text-white' : inRange ? 'bg-violet-100 text-violet-800' : 'text-zinc-700 hover:bg-violet-50',
               ].join(' ')}
             >
               {parseInt(v.slice(-2), 10)}
@@ -82,22 +83,6 @@ function MonthGrid({
   )
 }
 
-const STORAGE_KEY = 'shopsaas-daterange'
-
-function saveRange(range: string, from?: string, to?: string) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ range, from: from ?? '', to: to ?? '' }))
-  } catch { /* silencieux */ }
-}
-
-function loadRange() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as { range: string; from: string; to: string }
-  } catch { return null }
-}
-
 export function DateRange({ compact = false, align = 'right' }: { compact?: boolean; align?: 'left' | 'right' }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -105,19 +90,6 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
   const fromParam = params.get('from') ?? ''
   const toParam = params.get('to') ?? ''
   const [open, setOpen] = useState(false)
-
-  // Au premier montage : si l'URL n'a pas de range, restaurer depuis localStorage
-  useEffect(() => {
-    if (params.get('range')) return // déjà dans l'URL, ne rien faire
-    const saved = loadRange()
-    if (!saved || saved.range === '7d') return // valeur par défaut, pas besoin de naviguer
-    const next = new URLSearchParams(params.toString())
-    next.set('range', saved.range)
-    if (saved.from) next.set('from', saved.from)
-    if (saved.to) next.set('to', saved.to)
-    router.replace(`?${next.toString()}`)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
   const [hovering, setHovering] = useState('')
   const [mobile, setMobile] = useState(false)
   const [draftFrom, setDraftFrom] = useState(fromParam)
@@ -136,6 +108,19 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
     return () => window.removeEventListener('resize', sync)
   }, [])
 
+  // Restaurer depuis localStorage si l'URL n'a pas de range
+  useEffect(() => {
+    if (params.get('range')) return
+    const saved = loadRange()
+    if (!saved || saved.range === '7d') return
+    const next = new URLSearchParams(params.toString())
+    next.set('range', saved.range)
+    if (saved.from) next.set('from', saved.from)
+    if (saved.to) next.set('to', saved.to)
+    router.replace(`?${next.toString()}`)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     if (!open) return
     setDraftFrom(fromParam)
@@ -145,72 +130,62 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
     }
     document.addEventListener('mousedown', handler)
     document.body.style.overflow = mobile ? 'hidden' : ''
-    return () => {
-      document.removeEventListener('mousedown', handler)
-      document.body.style.overflow = ''
-    }
+    return () => { document.removeEventListener('mousedown', handler); document.body.style.overflow = '' }
   }, [open, mobile, fromParam, toParam])
 
-  function pushParams(next: URLSearchParams) {
-    router.push(`?${next.toString()}`)
-  }
+  function pushParams(next: URLSearchParams) { router.push(`?${next.toString()}`) }
 
   function setRange(range: string) {
     const next = new URLSearchParams(params.toString())
-    next.set('range', range)
-    next.delete('from')
-    next.delete('to')
+    next.set('range', range); next.delete('from'); next.delete('to')
     saveRange(range)
     pushParams(next)
     setOpen(false)
   }
 
   function pickDate(value: string) {
-    if (!draftFrom || (draftFrom && draftTo)) {
-      setDraftFrom(value)
-      setDraftTo('')
-      return
-    }
-    if (value < draftFrom) {
-      setDraftTo(draftFrom)
-      setDraftFrom(value)
-      return
-    }
+    if (!draftFrom || (draftFrom && draftTo)) { setDraftFrom(value); setDraftTo(''); return }
+    if (value < draftFrom) { setDraftTo(draftFrom); setDraftFrom(value); return }
     setDraftTo(value)
   }
 
   function applyCustom() {
     if (!draftFrom) return
     const next = new URLSearchParams(params.toString())
-    next.set('range', 'custom')
-    next.set('from', draftFrom)
-    if (draftTo) next.set('to', draftTo)
-    else next.delete('to')
+    next.set('range', 'custom'); next.set('from', draftFrom)
+    if (draftTo) next.set('to', draftTo); else next.delete('to')
     saveRange('custom', draftFrom, draftTo || undefined)
     pushParams(next)
     setOpen(false)
   }
 
   const activePreset = PRESETS.find(p => p.value === current)
-  let displayLabel = activePreset?.label ?? 'Periode'
+  let displayLabel = activePreset?.label ?? 'Période'
   if (current === 'custom') {
-    if (fromParam && toParam) displayLabel = `${formatShort(fromParam)} - ${formatShort(toParam)}`
+    if (fromParam && toParam) displayLabel = `${formatShort(fromParam)} – ${formatShort(toParam)}`
     else if (fromParam) displayLabel = `Depuis ${formatShort(fromParam)}`
-    else displayLabel = 'Personnalisee'
+    else displayLabel = 'Personnalisée'
   }
 
-  const presets = (
-    <div className={mobile ? 'flex gap-2 overflow-x-auto px-4 pb-1' : 'flex min-w-[168px] flex-col gap-1 border-r border-zinc-100 bg-zinc-50 p-3'}>
+  /* ── Presets ── */
+  const presetList = (
+    <div className={mobile
+      ? 'flex gap-2 overflow-x-auto px-4 pb-3 pt-1 scrollbar-none'
+      : 'flex w-36 flex-col gap-0.5 border-r border-zinc-100 p-2'
+    }>
       {PRESETS.map(preset => (
         <button
           key={preset.value}
           type="button"
           onClick={() => setRange(preset.value)}
-          className={`${mobile ? 'shrink-0 rounded-full bg-zinc-100 px-3 py-2' : 'w-full rounded-xl px-3 py-2.5 text-left hover:bg-white'} text-sm font-semibold ${
-            current === preset.value && current !== 'custom'
-              ? 'bg-violet-600 text-white hover:bg-violet-600'
-              : 'text-zinc-700'
-          }`}
+          className={[
+            mobile
+              ? 'shrink-0 rounded-full px-3.5 py-2 text-xs font-bold whitespace-nowrap border'
+              : 'w-full rounded-lg px-3 py-2 text-left text-sm font-semibold',
+            current === preset.value
+              ? 'bg-violet-600 text-white border-violet-600'
+              : 'text-zinc-700 hover:bg-zinc-100 border-zinc-200',
+          ].join(' ')}
         >
           {preset.label}
         </button>
@@ -218,51 +193,48 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
     </div>
   )
 
-  const calendar = (
-    <div className="flex flex-1 flex-col p-4">
+  /* ── Calendrier ── */
+  const calendarSection = (
+    <div className="flex flex-1 flex-col p-3">
+      {/* Du / Au */}
       <div className="mb-3 grid grid-cols-2 gap-2">
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Du</p>
-          <p className="text-sm font-bold text-zinc-800">{draftFrom ? formatShort(draftFrom) : 'Date de debut'}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Du</p>
+          <p className="text-sm font-bold text-zinc-800">{draftFrom ? formatShort(draftFrom) : '—'}</p>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Au</p>
-          <p className="text-sm font-bold text-zinc-800">{draftTo ? formatShort(draftTo) : 'Date de fin'}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Au</p>
+          <p className="text-sm font-bold text-zinc-800">{draftTo ? formatShort(draftTo) : '—'}</p>
         </div>
       </div>
-      <div className="mb-3 flex items-center justify-between">
-        <button type="button" onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() - 1, 1))} className="flex size-10 items-center justify-center rounded-full hover:bg-zinc-100">
+
+      {/* Navigation mois */}
+      <div className="mb-2 flex items-center justify-between">
+        <button type="button" onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() - 1, 1))} className="flex size-8 items-center justify-center rounded-lg hover:bg-zinc-100">
           <ChevronLeft className="size-4" />
         </button>
-        <p className="text-sm font-semibold text-zinc-800">
-          {!draftFrom ? 'Choisis la date de debut' : !draftTo ? 'Choisis la date de fin' : `${formatShort(draftFrom)} - ${formatShort(draftTo)}`}
+        <p className="text-xs font-semibold text-zinc-500">
+          {!draftFrom ? 'Choisis la date de début' : !draftTo ? 'Choisis la date de fin' : `${formatShort(draftFrom)} – ${formatShort(draftTo)}`}
         </p>
-        <button type="button" onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() + 1, 1))} className="flex size-10 items-center justify-center rounded-full hover:bg-zinc-100">
+        <button type="button" onClick={() => setLeftMonth(new Date(leftMonth.getFullYear(), leftMonth.getMonth() + 1, 1))} className="flex size-8 items-center justify-center rounded-lg hover:bg-zinc-100">
           <ChevronRight className="size-4" />
         </button>
       </div>
-      <div className={`flex gap-6 ${mobile ? 'justify-center' : ''}`} onMouseLeave={() => setHovering('')}>
+
+      {/* Grilles */}
+      <div className="flex gap-4" onMouseLeave={() => setHovering('')}>
         <MonthGrid month={leftMonth} from={draftFrom} to={draftTo} hovering={hovering} onPick={pickDate} onHover={setHovering} />
         {!mobile && (
-          <div className="hidden sm:block">
-            <MonthGrid month={rightMonth} from={draftFrom} to={draftTo} hovering={hovering} onPick={pickDate} onHover={setHovering} />
-          </div>
+          <MonthGrid month={rightMonth} from={draftFrom} to={draftTo} hovering={hovering} onPick={pickDate} onHover={setHovering} />
         )}
       </div>
-      <div className="mt-4 flex items-center justify-between gap-2 border-t border-zinc-100 pt-3">
-        <button
-          type="button"
-          onClick={() => { setDraftFrom(''); setDraftTo('') }}
-          className="text-sm font-semibold text-zinc-500"
-        >
+
+      {/* Actions */}
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-zinc-100 pt-3">
+        <button type="button" onClick={() => { setDraftFrom(''); setDraftTo('') }} className="text-sm font-semibold text-zinc-400 hover:text-zinc-600">
           Effacer
         </button>
-        <button
-          type="button"
-          disabled={!draftFrom}
-          onClick={applyCustom}
-          className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-        >
+        <button type="button" disabled={!draftFrom} onClick={applyCustom} className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40 hover:bg-violet-700 transition">
           Appliquer
         </button>
       </div>
@@ -271,36 +243,40 @@ export function DateRange({ compact = false, align = 'right' }: { compact?: bool
 
   return (
     <div className={`relative ${mobile ? 'w-full' : ''}`} ref={dropdownRef}>
+      {/* Bouton déclencheur */}
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="flex w-full max-w-full items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-medium text-zinc-700 shadow-sm md:w-auto"
+        className="flex w-full items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-sm hover:border-zinc-300 transition md:w-auto"
       >
-        <CalendarDays className="size-4 shrink-0 text-zinc-400" />
-        <span className="truncate">{compact ? displayLabel : displayLabel}</span>
+        <CalendarDays className="size-4 shrink-0 text-violet-500" />
+        <span className="truncate">{displayLabel}</span>
       </button>
 
+      {/* Desktop dropdown */}
       {open && !mobile && (
-        <div className={`absolute top-12 z-50 flex overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl ${align === 'left' ? 'left-0' : 'right-0'}`}>
-          {presets}
-          {calendar}
+        <div className={`absolute top-11 z-50 flex overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl ${align === 'left' ? 'left-0' : 'right-0'}`}
+          style={{ minWidth: 560 }}>
+          {presetList}
+          {calendarSection}
         </div>
       )}
 
+      {/* Mobile bottom sheet */}
       {open && mobile && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[80] flex items-end bg-black/40 md:hidden" onClick={() => setOpen(false)}>
-          <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl" onClick={event => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[80] flex items-end bg-black/40" onClick={() => setOpen(false)}>
+          <div className="max-h-[90dvh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 z-10 rounded-t-3xl bg-white">
-              <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-zinc-200" />
+              <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-zinc-200" />
               <div className="flex items-center justify-between px-4 py-3">
-                <p className="text-base font-bold">Periode</p>
-                <button type="button" onClick={() => setOpen(false)} className="flex size-9 items-center justify-center rounded-full bg-zinc-100" aria-label="Fermer">
+                <p className="text-base font-bold text-zinc-900">Période</p>
+                <button type="button" onClick={() => setOpen(false)} className="flex size-8 items-center justify-center rounded-full bg-zinc-100">
                   <X className="size-4" />
                 </button>
               </div>
-              {presets}
+              {presetList}
             </div>
-            {calendar}
+            {calendarSection}
           </div>
         </div>,
         document.body,
