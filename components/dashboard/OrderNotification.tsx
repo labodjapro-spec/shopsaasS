@@ -326,6 +326,8 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
       } catch { /* silencieux */ }
     }
     void fetchMissed()
+
+    const checkReminders = async () => {
       try {
         const res = await fetch(`/api/orders/reminders?store_ids=${encodeURIComponent(storeIds.join(','))}`)
         const data = await res.json().catch(() => ({ dueReminders: [], upcoming: [] }))
