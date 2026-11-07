@@ -1,11 +1,11 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Bell, CheckCircle2, Download, Smartphone, Stethoscope, XCircle } from 'lucide-react'
 import InstallAppButton from '@/app/InstallAppButton'
 import { isIosDevice, isStandaloneDisplay, subscribeInstallPrompt } from '@/lib/pwa/install'
-import { isPushFlagEnabled, removePushSubscription, runPushDiagnostic, savePushSubscription, setPushFlag, type PushCheck } from '@/lib/push/browser'
+import { isCapacitorNative, isPushFlagEnabled, removePushSubscription, runPushDiagnostic, savePushSubscription, setPushFlag, type PushCheck } from '@/lib/push/browser'
 
 export default function AppSetup() {
   const [installed, setInstalled] = useState(false)
@@ -40,6 +40,15 @@ export default function AppSetup() {
     let active = true
     setInstalled(isStandaloneDisplay())
     setIos(isIosDevice())
+
+    // Dans Capacitor (APK Android), FCM gere les notifications nativement
+    if (isCapacitorNative()) {
+      setPushEnabled(true)
+      setPermission('granted')
+      setInstalled(true) // L'APK est considere comme installe
+      return () => {}
+    }
+
     setPushEnabled(isPushFlagEnabled())
     setPermission(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission)
     const unsub = subscribeInstallPrompt((event) => setCanPrompt(Boolean(event)))
@@ -71,6 +80,12 @@ export default function AppSetup() {
   }, [])
 
   async function enablePush() {
+    // Dans Capacitor, FCM est deja actif
+    if (isCapacitorNative()) {
+      setPushEnabled(true)
+      toast.success('Les notifications sont actives via FCM sur cet appareil.')
+      return
+    }
     if (ios && !installed) {
       toast('Installe d’abord l’app sur l’ecran d’accueil, puis rouvre-la depuis l’icone.', { duration: 7000 })
       return

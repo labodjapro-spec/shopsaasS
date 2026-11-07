@@ -3,7 +3,7 @@
   "appName": "ShopSa",
   "webDir": "out",
   "server": {
-    "url": "https://shopsa-b7sgv.vercel.app",
+    "url": "https://shopsaas-s-one.vercel.app",
     "cleartext": true
   },
   "plugins": {

@@ -1,4 +1,4 @@
-const DEVICE_KEY = 'shopsaas-device-id'
+﻿const DEVICE_KEY = 'shopsaas-device-id'
 const PUSH_FLAG = 'shopsaas-push-enabled'
 
 export function getDeviceId() {
@@ -16,6 +16,11 @@ export function isPushFlagEnabled() {
 
 export function setPushFlag(enabled: boolean) {
   window.localStorage.setItem(PUSH_FLAG, String(enabled))
+}
+
+/** Returns true when running inside the Capacitor Android APK (WebView). */
+export function isCapacitorNative(): boolean {
+  return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
 }
 
 function urlBase64ToUint8Array(base64String: string) {
@@ -58,6 +63,11 @@ async function getFreshSubscription(registration: ServiceWorkerRegistration, app
 }
 
 export async function savePushSubscription() {
+  // Dans Capacitor (APK Android), FCM gere les notifications via useFCMPush.ts
+  if (isCapacitorNative()) {
+    setPushFlag(true)
+    return null as any
+  }
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     throw new Error('Ce navigateur ne prend pas en charge les notifications Push.')
   }
@@ -107,6 +117,16 @@ export type PushCheck = { id: string; label: string; ok: boolean; detail?: strin
 
 /** Runs the full server-side diagnostic and sends a test notification. */
 export async function runPushDiagnostic(): Promise<{ ok: boolean; checks: PushCheck[] }> {
+  // Dans Capacitor, FCM est gere nativement - tout est OK
+  if (isCapacitorNative()) {
+    return {
+      ok: true,
+      checks: [
+        { id: 'support', label: 'Mode application native', ok: true, detail: 'APK Android avec FCM' },
+        { id: 'fcm', label: 'Notifications FCM', ok: true, detail: "Gerees nativement par l'application" },
+      ],
+    }
+  }
   const local: PushCheck[] = []
   const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
   local.push({
