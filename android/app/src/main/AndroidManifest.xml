@@ -1,5 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+﻿<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -34,11 +35,18 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- Service FCM pour notifications natives ShopSa -->
+        <!-- Désactiver le MessagingService de Capacitor Push (il ne crée pas de notif système) -->
+        <service
+            android:name="com.capacitorjs.plugins.pushnotifications.MessagingService"
+            android:exported="false"
+            android:enabled="false"
+            tools:node="replace" />
+
+        <!-- Notre service FCM qui crée des vraies notifications système (pastille + son) -->
         <service
             android:name=".ShopSaFirebaseMessagingService"
             android:exported="false">
-            <intent-filter>
+            <intent-filter android:priority="100">
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
