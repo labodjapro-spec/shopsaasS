@@ -24,7 +24,7 @@ import com.google.firebase.messaging.RemoteMessage;
 public class ShopSaFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG          = "ShopSaFCM";
-    private static final String CHANNEL_ID   = "shopsa_orders";
+    private static final String CHANNEL_ID   = "shopsa_orders_v2";   // v2 force un nouveau canal avec IMPORTANCE_HIGH
     private static final String CHANNEL_NAME = "Nouvelles commandes";
 
     @Override
@@ -124,7 +124,7 @@ public class ShopSaFirebaseMessagingService extends FirebaseMessagingService {
 
         NotificationCompat.Builder notificationBuilder =
             new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_notification)  // icône monochrome blanche sac de shopping
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(bigText))

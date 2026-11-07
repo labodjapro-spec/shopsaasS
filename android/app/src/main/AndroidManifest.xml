@@ -54,12 +54,12 @@
         <!-- Canal de notification par défaut -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="shopsa_orders" />
+            android:value="shopsa_orders_v2" />
 
-        <!-- Icône de notification (petite icône blanche sur fond coloré) -->
+        <!-- Icône de notification (petite icône blanche monochrome) -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@mipmap/ic_launcher" />
+            android:resource="@drawable/ic_notification" />
 
         <!-- Couleur de la notification -->
         <meta-data
