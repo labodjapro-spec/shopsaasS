@@ -308,20 +308,48 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
     if (!storeIds.length) return
 
     // Récupérer les commandes manquées des dernières 24h au montage
+    // Si plusieurs commandes manquées → un seul toast résumé (pas un par commande)
     const fetchMissed = async () => {
       try {
         const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
         const response = await fetch(`/api/orders/poll?store_ids=${encodeURIComponent(storeIds.join(','))}&since=${encodeURIComponent(since)}`)
         const data = await response.json().catch(() => ({ orders: [] }))
-        let missedCount = 0
-        for (const order of data.orders ?? []) {
-          if (!knownIds.current.has(order.id)) {
-            missedCount++
-            handleNewOrder(order)
-          }
-        }
-        if (missedCount > 0) {
-          console.log(`[OrderNotification] ${missedCount} commande(s) manquée(s) récupérée(s)`)
+        const missed = (data.orders ?? []).filter((o: any) => !knownIds.current.has(o.id))
+        if (missed.length === 0) return
+        // Marquer toutes comme vues
+        missed.forEach((o: any) => knownIds.current.add(o.id))
+        try { sessionStorage.setItem('shopsaas-known-orders', JSON.stringify(Array.from(knownIds.current).slice(-100))) } catch { /* silent */ }
+
+        if (missed.length === 1) {
+          // Une seule commande → toast normal
+          const o = missed[0]
+          if (soundEnabled) playOrderSound(audioRef.current)
+          showOrderToast(o)
+        } else {
+          // Plusieurs → un seul toast résumé
+          const last = missed[missed.length - 1]
+          toast.custom(
+            (t) => (
+              <div className={`relative flex w-[min(440px,calc(100vw-32px))] items-center gap-3 rounded-2xl border-2 border-violet-200 bg-white p-4 shadow-2xl transition-all duration-300 ${t.visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-700 shadow-lg shadow-violet-200">
+                  <ShoppingBag className="size-6 text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-black text-zinc-950">{missed.length} commandes manquées</p>
+                  <p className="mt-1 text-sm text-zinc-500">Dernière : {last.customer_name} · {last.order_number}</p>
+                  <button
+                    type="button"
+                    onClick={() => { toast.dismiss(t.id); window.location.href = '/dashboard/orders' }}
+                    className="mt-3 inline-flex items-center rounded-xl bg-violet-700 px-3.5 py-2 text-xs font-extrabold text-white hover:bg-violet-800"
+                  >
+                    Voir toutes les commandes →
+                  </button>
+                </div>
+                <button type="button" onClick={() => toast.dismiss(t.id)} className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-100">×</button>
+              </div>
+            ),
+            { id: 'missed-orders-toast', duration: 20000, position: 'top-right' },
+          )
         }
       } catch { /* silencieux */ }
     }
