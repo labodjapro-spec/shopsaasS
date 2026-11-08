@@ -390,7 +390,7 @@ Deno.serve(async (request) => {
     amount,
     currency,
     storeName,
-    url: `/dashboard/orders/${order.id}`,
+    url: `/api/orders/open?order_id=${order.id}&store_id=${storeId}`,
     ...(isReminder ? { reminder: 'true', note: extraNote } : {}),
   }
 
@@ -408,7 +408,7 @@ Deno.serve(async (request) => {
       : {
           title: notifTitle,
           body: notifBody,
-          url: `/dashboard/orders/${order.id}`,
+          url: `/api/orders/open?order_id=${order.id}&store_id=${storeId}`,
           tag: `order-${order.id}`,
           ...notifData,
           total,

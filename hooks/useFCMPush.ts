@@ -65,6 +65,21 @@ export function useFCMPush() {
           }
         })
 
+        // Refresh session Supabase quand l'app revient au premier plan (après suspension)
+        const { App } = await import('@capacitor/app')
+        App.addListener('appStateChange', async ({ isActive }) => {
+          if (!isActive || cancelled) return
+          try {
+            const { createClient } = await import('@/lib/supabase/client')
+            const supabase = createClient()
+            const { data: { session } } = await supabase.auth.getSession()
+            if (session) {
+              // Refresh silencieux du token
+              await supabase.auth.refreshSession()
+            }
+          } catch { /* silencieux */ }
+        })
+
         PushNotifications.addListener('registrationError', (err) => {
           console.error('[FCM] Erreur registration:', err)
         })
