@@ -243,6 +243,7 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
     knownIds.current.add(id)
     try {
       sessionStorage.setItem('shopsaas-known-orders', JSON.stringify(Array.from(knownIds.current).slice(-100)))
+      localStorage.setItem('shopsaas-last-order-seen', new Date().toISOString())
     } catch { /* silencieux */ }
     return true
   }, [])
@@ -307,15 +308,23 @@ export default function OrderNotification({ storeIds }: OrderNotificationProps) 
   useEffect(() => {
     if (!storeIds.length) return
 
-    // Récupérer les commandes manquées des dernières 24h au montage
+    // Récupérer les commandes manquées depuis la dernière visite (pas les 24h en dur)
     // Si plusieurs commandes manquées → un seul toast résumé (pas un par commande)
     const fetchMissed = async () => {
       try {
-        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-        const response = await fetch(`/api/orders/poll?store_ids=${encodeURIComponent(storeIds.join(','))}&since=${encodeURIComponent(since)}`)
+        // Lire le timestamp de la dernière commande vue
+        const lastSeen = localStorage.getItem('shopsaas-last-order-seen') ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        const response = await fetch(`/api/orders/poll?store_ids=${encodeURIComponent(storeIds.join(','))}&since=${encodeURIComponent(lastSeen)}`)
         const data = await response.json().catch(() => ({ orders: [] }))
         const missed = (data.orders ?? []).filter((o: any) => !knownIds.current.has(o.id))
         if (missed.length === 0) return
+
+        // Sauvegarder le timestamp de la commande la plus récente
+        const latest = missed[missed.length - 1]
+        if (latest?.created_at) {
+          localStorage.setItem('shopsaas-last-order-seen', latest.created_at)
+        }
+
         // Marquer toutes comme vues
         missed.forEach((o: any) => knownIds.current.add(o.id))
         try { sessionStorage.setItem('shopsaas-known-orders', JSON.stringify(Array.from(knownIds.current).slice(-100))) } catch { /* silent */ }

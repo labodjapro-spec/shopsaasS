@@ -91,6 +91,8 @@ export function useFCMPush() {
                 body: bigBody,
                 channelId: 'shopsa_orders_v2',
                 sound: 'default',
+                smallIcon: 'ic_notification',   // drawable monochrome blanc
+                iconColor: '#7C3AED',            // fond violet du rond
                 actionTypeId: '',
                 extra: data,
                 // Afficher immédiatement
