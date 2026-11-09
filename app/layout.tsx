@@ -20,6 +20,9 @@ export const metadata: Metadata = {
     icon: '/icons/app-192.png',
     apple: '/icons/app-apple.png',
   },
+  other: {
+    'facebook-domain-verification': '6cvt5nxla68x77kk3nrmsmc6o334x5',
+  },
 }
 
 export const viewport: Viewport = {
