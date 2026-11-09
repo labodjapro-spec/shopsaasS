@@ -428,10 +428,10 @@ const btnAnimation: BtnAnimation = formSettings.btn_animation || 'pulse'
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-3.5" autoComplete="off" noValidate>
             {[
-              { key: 'name', show: formSettings.show_name !== false, label: 'Nom complet *', val: name, set: setName, type: 'text', ph: 'Ex: Amadou Diallo', req: true, autoComplete: 'name', inputMode: undefined as string | undefined },
-              { key: 'phone', show: formSettings.show_phone !== false, label: 'Téléphone *', val: phone, set: setPhone, type: 'tel', ph: 'Ex: 620 00 00 00', req: true, autoComplete: 'tel', inputMode: 'numeric' },
-              { key: 'city', show: formSettings.show_city !== false, label: 'Ville / Quartier *', val: city, set: setCity, type: 'text', ph: 'Ex: Conakry, Matam', req: true, autoComplete: 'address-level2', inputMode: undefined },
-              { key: 'email', show: !!formSettings.show_email, label: 'Email', val: email, set: setEmail, type: 'email', ph: 'email@exemple.com', req: false, autoComplete: 'email', inputMode: 'email' },
+              { key: 'name', show: formSettings.show_name !== false, label: 'Nom complet *', val: name, set: setName, type: 'text', ph: formSettings.ph_name || 'Ex: Amadou Diallo', req: true, autoComplete: 'name', inputMode: undefined as string | undefined },
+              { key: 'phone', show: formSettings.show_phone !== false, label: 'Téléphone *', val: phone, set: setPhone, type: 'tel', ph: formSettings.ph_phone || 'Ex: 620 00 00 00', req: true, autoComplete: 'tel', inputMode: 'numeric' },
+              { key: 'city', show: formSettings.show_city !== false, label: 'Ville / Quartier *', val: city, set: setCity, type: 'text', ph: formSettings.ph_city || 'Ex: Conakry, Matam', req: true, autoComplete: 'address-level2', inputMode: undefined },
+              { key: 'email', show: !!formSettings.show_email, label: 'Email', val: email, set: setEmail, type: 'email', ph: formSettings.ph_email || 'email@exemple.com', req: false, autoComplete: 'email', inputMode: 'email' },
             ].filter(f => f.show).map(f => (
               <div key={f.key} className="order-field">
                 <label className="block text-xs font-black mb-1.5 uppercase tracking-wide" style={{ color: colors.label }}>{f.label}</label>

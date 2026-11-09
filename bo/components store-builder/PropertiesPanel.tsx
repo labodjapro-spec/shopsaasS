@@ -528,9 +528,21 @@ export default function PropertiesPanel({ block, onUpdateSettings, onDelete, onC
 
             <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 mt-4">Champs du formulaire</h4>
             <ToggleField label="Afficher champ Nom" value={s.show_name !== false} onChange={v => update('show_name', v)} />
+            {s.show_name !== false && (
+              <TextField label="Placeholder Nom" value={s.ph_name ?? ''} onChange={v => update('ph_name', v)} placeholder="Ex: Amadou Diallo" />
+            )}
             <ToggleField label="Afficher champ Téléphone" value={s.show_phone !== false} onChange={v => update('show_phone', v)} />
+            {s.show_phone !== false && (
+              <TextField label="Placeholder Téléphone" value={s.ph_phone ?? ''} onChange={v => update('ph_phone', v)} placeholder="Ex: 620 00 00 00" />
+            )}
             <ToggleField label="Afficher champ Ville" value={s.show_city !== false} onChange={v => update('show_city', v)} />
+            {s.show_city !== false && (
+              <TextField label="Placeholder Ville" value={s.ph_city ?? ''} onChange={v => update('ph_city', v)} placeholder="Ex: Conakry, Matam" />
+            )}
             <ToggleField label="Afficher champ Email" value={!!s.show_email} onChange={v => update('show_email', v)} />
+            {s.show_email && (
+              <TextField label="Placeholder Email" value={s.ph_email ?? ''} onChange={v => update('ph_email', v)} placeholder="Ex: email@exemple.com" />
+            )}
 
             <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 mt-4">Commande via WhatsApp</h4>
             <ToggleField label="Rediriger vers WhatsApp au clic" value={!!s.enable_whatsapp_order} onChange={v => update('enable_whatsapp_order', v)} />
