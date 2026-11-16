@@ -1,0 +1,216 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary-50:  #eff4ff;
+  --color-primary-100: #dbe6ff;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-900: #1e3a8a;
+
+  --color-accent-cyan: #22d3ee;
+  --color-accent-cyan-dark: #0891b2;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+/* ─── Design tokens ──────────────────────────────────────── */
+:root {
+  /* Light mode */
+  --bg:         #f0f4fc;
+  --bg-soft:    #ffffff;
+  --card:       #ffffff;
+  --card-2:     #f5f8ff;
+  --border:     rgba(37,99,235,0.10);
+  --border-strong: rgba(37,99,235,0.22);
+  --accent-a:   #2563eb;
+  --accent-b:   #0891b2;
+  --text:       #0f172a;
+  --text-dim:   #5d6b85;
+  --text-faint: #94a3b8;
+  --success:    #16a34a;
+  --success-bg: rgba(22,163,74,0.10);
+  --warning:    #b45309;
+  --warning-bg: rgba(180,83,9,0.10);
+  --danger:     #dc2626;
+  --danger-bg:  rgba(220,38,38,0.10);
+  --sidebar-w:  260px;
+  --sidebar-collapsed-w: 68px;
+  --header-h:   60px;
+  --radius:     14px;
+}
+
+.dark {
+  --bg:         #060b16;
+  --bg-soft:    #0a1120;
+  --card:       #0e1728;
+  --card-2:     #101c33;
+  --border:     rgba(94,148,255,0.14);
+  --border-strong: rgba(94,148,255,0.30);
+  --accent-a:   #3b82f6;
+  --accent-b:   #22d3ee;
+  --text:       #eaf0fb;
+  --text-dim:   #8b97b3;
+  --text-faint: #5b6685;
+  --success:    #22c55e;
+  --success-bg: rgba(34,197,94,0.12);
+  --warning:    #eab308;
+  --warning-bg: rgba(234,179,8,0.12);
+  --danger:     #f87171;
+  --danger-bg:  rgba(248,113,113,0.12);
+}
+
+/* ─── Base ───────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+/* Dark mode body: radial glows */
+.dark body,
+body.dark {
+  background:
+    radial-gradient(900px 500px at 90% -5%, rgba(59,130,246,0.14) 0%, transparent 60%),
+    radial-gradient(700px 400px at -5% 25%, rgba(34,211,238,0.09) 0%, transparent 55%),
+    var(--bg);
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(139,151,179,0.25); border-radius: 6px; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ─── Sidebar CSS variables (used by JS toggle) ──────────── */
+.sidebar-expanded  { width: var(--sidebar-w); }
+.sidebar-collapsed { width: var(--sidebar-collapsed-w); }
+
+/* ─── Card glass ─────────────────────────────────────────── */
+.eb-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 1px var(--border), 0 20px 40px -24px rgba(59,130,246,0.20);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.eb-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 1px var(--border-strong), 0 24px 48px -20px rgba(59,130,246,0.28);
+}
+
+/* ─── Badge ──────────────────────────────────────────────── */
+.badge-up   { color: var(--success); background: var(--success-bg); }
+.badge-warn { color: var(--warning); background: var(--warning-bg); }
+.badge-danger { color: var(--danger); background: var(--danger-bg); }
+.badge-flat { color: var(--text-dim); background: rgba(139,151,179,0.12); }
+
+/* ─── Nav active gradient ────────────────────────────────── */
+.nav-active {
+  background: linear-gradient(90deg, rgba(59,130,246,0.20), rgba(34,211,238,0.06));
+  border: 1px solid var(--border-strong);
+  color: var(--accent-b);
+  font-weight: 700;
+}
+.dark .nav-active { color: var(--accent-b); }
+
+/* ─── Sparkline stroke ───────────────────────────────────── */
+.spark-gradient stop:first-child { stop-color: var(--accent-a); }
+.spark-gradient stop:last-child  { stop-color: var(--accent-b); }
+
+/* ─── Segmented control ──────────────────────────────────── */
+.seg-btn-active {
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: #fff;
+  box-shadow: 0 4px 12px -4px rgba(59,130,246,0.50);
+}
+
+/* ─── Table hover ────────────────────────────────────────── */
+tbody tr:hover { background: rgba(94,148,255,0.05); }
+
+/* ─── Status pills ───────────────────────────────────────── */
+.status-confirmed { color: var(--success); background: var(--success-bg); }
+.status-pending   { color: var(--warning); background: var(--warning-bg); }
+.status-cancelled { color: var(--danger);  background: var(--danger-bg);  }
+
+/* ─── Commission boxes ───────────────────────────────────── */
+.comm-closer  { background: var(--warning-bg); color: var(--warning); }
+.comm-livreur { background: rgba(59,130,246,0.12); color: var(--accent-a); }
+.comm-total   { background: var(--danger-bg);  color: var(--danger);  }
+.comm-net     { background: var(--success-bg); color: var(--success); }
+
+/* ─── Mobile ────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* On mobile, sidebar is overlay — main content takes full width */
+  #main-content-wrapper {
+    margin-left: 0 !important;
+  }
+
+  /* Tighter main padding on mobile */
+  #main-content-wrapper > main {
+    padding: 16px 14px 80px !important;
+    /* Safe area for iPhone notch */
+    padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .text-4xl { font-size: 1.75rem !important; }
+  .text-5xl { font-size: 2rem !important; }
+  .text-6xl { font-size: 2.5rem !important; }
+  .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+
+  /* Only enforce min-height on text buttons, not icon-only */
+  button:not(.icon-btn), a:not(.icon-link) { min-height: 40px; }
+
+  /* Tables on mobile: hide them in favor of .mobile-cards */
+  .mobile-table-hidden { display: none !important; }
+  .mobile-cards { display: flex !important; flex-direction: column; gap: 10px; }
+
+  /* Reduce horizontal padding on section headers */
+  h1 { font-size: clamp(1.25rem, 5vw, 1.75rem) !important; }
+
+  /* Compact page header area */
+  .page-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+}
+
+/* On desktop: always show table, hide mobile cards */
+@media (min-width: 641px) {
+  .mobile-cards { display: none !important; }
+  .mobile-table-hidden { display: block !important; }
+}
+
+/* ─── Store Builder Drawer ───────────────────────────────── */
+@keyframes drawer-slide-left  { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes drawer-slide-right { from { transform: translateX(100%); }  to { transform: translateX(0); } }
+.animate-drawer-left  { animation: drawer-slide-left  0.3s cubic-bezier(0.32,0.72,0,1) both; }
+.animate-drawer-right { animation: drawer-slide-right 0.3s cubic-bezier(0.32,0.72,0,1) both; }
+
+/* ─── Tiptap editor ──────────────────────────────────────── */
+.ProseMirror h1 { font-size: 2.25rem !important; font-weight: 800 !important; line-height: 1.2 !important; margin-top: 1.5rem !important; }
+.ProseMirror h2 { font-size: 1.75rem !important; font-weight: 700 !important; line-height: 1.25 !important; margin-top: 1.25rem !important; }
+.ProseMirror h3 { font-size: 1.4rem  !important; font-weight: 700 !important; line-height: 1.3  !important; margin-top: 1rem !important; }
+.ProseMirror p  { line-height: 1.7 !important; margin-bottom: 0.75rem !important; }
+.ProseMirror ul, .ProseMirror ol { padding-left: 1.5rem !important; margin-bottom: 0.75rem !important; }
+.ProseMirror li { margin-bottom: 0.25rem !important; }
+.ProseMirror a  { color: var(--accent-a) !important; text-decoration: underline !important; }
+.ProseMirror blockquote { border-left: 3px solid var(--accent-a) !important; padding-left: 1rem !important; color: var(--text-dim) !important; }
+.ProseMirror code { background: var(--card-2) !important; padding: 0.1em 0.35em !important; border-radius: 4px !important; font-size: 0.9em !important; }
+.ProseMirror pre  { background: var(--card-2) !important; padding: 1rem !important; border-radius: 8px !important; overflow-x: auto !important; }
+
+/* ─── Facebook Ads Preview ───────────────────────────────── */
+.preview-container iframe {
+  width: 100% !important; min-width: 500px !important; max-width: 600px !important;
+  min-height: 650px !important; border: none !important; border-radius: 16px;
+  background: white;
+}
+
+/* ─── Prevent table overflow in modals ───────────────────── */
+/* table { min-width: max-content; } REMOVED — caused horizontal overflow on mobile */
