@@ -1101,7 +1101,7 @@ function SpyPubsContent() {
                   <button
                     key={s.value}
                     type="button"
-                    onClick={() => { setSearchTerm(s.value); setActiveNiche("all"); doSearch({ term: s.value }); }}
+                    onClick={() => { setInputValue(s.value); setSearchTermInUrl(s.value); setActiveNiche("all"); doSearch({ term: s.value }); }}
                     className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all border ${
                       activeTerm === s.value
                         ? "text-white border-indigo-600"
