@@ -581,10 +581,11 @@ function ImportModal({
                 </button>
                 <button
                   onClick={() => {
-                    // Sauvegarder la position de scroll avant de naviguer
+                    // Sauvegarder la position de scroll et l'URL de retour avant de naviguer
                     sessionStorage.setItem('spy-pubs-scroll', String(window.scrollY));
+                    sessionStorage.setItem('spy-pubs-returnTo', window.location.href);
                     onClose();
-                    router.push(`/dashboard/products/${productId}?returnTo=${encodeURIComponent(window.location.href)}`);
+                    router.push(`/dashboard/products/${productId}`);
                   }}
                   className="flex-1 py-3 rounded-xl text-[11px] font-bold uppercase tracking-widest text-white shadow-sm hover:-translate-y-0.5 transition-all active:scale-95"
                   style={{ background: "var(--dashboard-accent)" }}
