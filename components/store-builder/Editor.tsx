@@ -320,6 +320,9 @@ export default function Editor({ storeId, storeName, storeSlug, returnHref = '/d
       template: [...prev.template, newBlock],
     }))
     setSelectedBlockId(newBlock.id)
+    // Fermer la sidebar mobile et ouvrir le panel propriétés immédiatement
+    setSidebarOpen(false)
+    setPropsPanelOpen(true)
   }, [])
 
   // Réordonner les blocs du template (avec garde-fou contre les index hors limites)

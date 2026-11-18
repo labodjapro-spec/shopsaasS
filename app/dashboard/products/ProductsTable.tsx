@@ -6,6 +6,8 @@ import { Package, Trash2, Check } from 'lucide-react'
 import { Badge, buttonClass } from '@/components/ui'
 import { formatMoney } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import ConfirmationModal from '@/components/ConfirmationModal'
+import toast from 'react-hot-toast'
 
 type Row = {
   id: string
@@ -32,6 +34,7 @@ export default function ProductsTable({ products: initialProducts, market, canEd
   const [products, setProducts] = useState<Row[]>(initialProducts)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   function toggleSelect(id: string) {
     setSelected(prev => {
@@ -51,15 +54,15 @@ export default function ProductsTable({ products: initialProducts, market, canEd
 
   async function deleteSelected() {
     if (!selected.size) return
-    if (!confirm(`Supprimer ${selected.size} produit(s) ? Cette action est irréversible.`)) return
     setDeleting(true)
     const ids = Array.from(selected)
     const { error } = await supabase.from('products').delete().in('id', ids)
     if (!error) {
       setProducts(prev => prev.filter(p => !selected.has(p.id)))
       setSelected(new Set())
+      toast.success(`${ids.length} produit(s) supprimé(s).`)
     } else {
-      alert('Erreur lors de la suppression : ' + error.message)
+      toast.error('Erreur lors de la suppression : ' + error.message)
     }
     setDeleting(false)
   }
@@ -70,6 +73,17 @@ export default function ProductsTable({ products: initialProducts, market, canEd
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
+      {/* Modal de confirmation suppression */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={deleteSelected}
+        title={`Supprimer ${selected.size} produit(s) ?`}
+        message="Cette action est irréversible. Les produits sélectionnés seront définitivement supprimés."
+        confirmLabel="Oui, supprimer"
+        cancelLabel="Annuler"
+        variant="danger"
+      />
       {/* Barre d'actions multi-select */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-violet-50 border-b border-violet-100">
@@ -77,7 +91,7 @@ export default function ProductsTable({ products: initialProducts, market, canEd
             {selected.size} sélectionné{selected.size > 1 ? 's' : ''}
           </span>
           <button
-            onClick={deleteSelected}
+            onClick={() => setShowDeleteConfirm(true)}
             disabled={deleting}
             className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
           >

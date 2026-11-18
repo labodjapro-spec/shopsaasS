@@ -34,6 +34,10 @@ import SlideshowRender from '@/components/store-builder/sections/SlideshowRender
 import HotspotsRender from '@/components/store-builder/sections/HotspotsRender'
 import ParallaxRender from '@/components/store-builder/sections/ParallaxRender'
 import ReelMediaRender from '@/components/store-builder/sections/ReelMediaRender'
+// Sections supplémentaires du catalogue (ajoutées au besoin)
+import HeroSection from '@/components/store-builder/sections/HeroSection'
+import TestimonialsSection from '@/components/store-builder/sections/TestimonialsSection'
+import PricingTableSection from '@/components/store-builder/sections/PricingTableSection'
 import { mergeHeaderTheme } from '@/lib/store-builder/landing-theme'
 
 // Les blocks de type "produit" — affichent des données du produit sélectionné.
@@ -194,6 +198,31 @@ export function renderBlock(block: any, product: any, storeId?: string | null, t
       break
 
     // ── Sections aliasées (catalogue étendu → réutilise les renderers existants) ──
+    case 'hero':
+    case 'Hero':
+      content = <HeroSection settings={settings} />
+      break
+    case 'Countdown':
+      content = <CountdownRender settings={settings} />
+      break
+    case 'Benefits':
+      content = <BenefitsRender settings={settings} />
+      break
+    case 'Video':
+      content = <VideoRender settings={settings} />
+      break
+    case 'Faq':
+      content = <FaqRender settings={settings} />
+      break
+    case 'ImageWithText':
+      content = <ImageTextRender settings={settings} />
+      break
+    case 'Testimonials':
+      content = <TestimonialsSection settings={settings} />
+      break
+    case 'PricingTable':
+      content = <PricingTableSection settings={settings} />
+      break
     case 'hero_editorial':
       content = <TextBlockRender settings={{ ...settings, content: settings.content || '', text_align: settings.text_align || 'center' }} />
       break

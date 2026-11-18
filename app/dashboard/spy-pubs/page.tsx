@@ -321,9 +321,10 @@ function ImportModal({
   onClose: () => void;
   router: ReturnType<typeof useRouter>;
 }) {
-  const [step, setStep] = useState<"choose" | "scraping" | "done">("choose");
+  const [step, setStep] = useState<"choose" | "url_input" | "scraping" | "done">("choose");
   const [productId, setProductId] = useState<string | null>(null);
-  const [importStats, setImportStats] = useState<{ images: number; scraped: boolean }>({ images: 0, scraped: false });
+  const [importStats, setImportStats] = useState<{ images: number; platform: string; needsPriceCheck: boolean }>({ images: 0, platform: "", needsPriceCheck: false });
+  const [customUrl, setCustomUrl] = useState(ad.siteUrl ?? "");
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -337,6 +338,17 @@ function ImportModal({
   const allImages = ad.allImageUrls?.length > 0 ? ad.allImageUrls : (imageUrl ? [imageUrl] : []);
   const hasSiteUrl = !!ad.siteUrl;
 
+  /** Vrai si l'URL ressemble à une page produit (Shopify /products/ ou YouCan /products/) */
+  function isProductUrl(url: string | null): boolean {
+    if (!url) return false;
+    try {
+      const u = new URL(url);
+      return u.pathname.includes('/products/') || u.pathname.includes('/product/');
+    } catch { return false; }
+  }
+
+  const siteIsProductUrl = isProductUrl(ad.siteUrl);
+
   async function getStoreId(): Promise<string | null> {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -349,90 +361,79 @@ function ImportModal({
     return memberships?.[0]?.store_id || null;
   }
 
-  async function insertProduct(opts: {
-    title: string;
-    description: string;
-    images: string[];
-    price: string;
-    scraped: boolean;
-  }) {
-    const supabase = createClient();
-    const storeId = await getStoreId();
-    const { data: newProduct, error } = await supabase
-      .from("products")
-      .insert({
-        title: opts.title,
-        description: opts.description,
-        image_url: opts.images[0] || null,
-        images: opts.images.slice(0, 20),
-        status: "draft",
-        price: opts.price || "0",
-        store_id: storeId,
-        tags: [
-          "source:spy_pubs",
-          opts.scraped ? "source:scraped" : "source:ad_text",
-          ...(ad.daysRunning ? [`actif:${ad.daysRunning}j`] : []),
-        ],
-        vendor: ad.pageName || null,
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-    setImportStats({ images: opts.images.length, scraped: opts.scraped });
-    setProductId(newProduct.id);
-    setStep("done");
-    toast.success(`Produit importé ! ${opts.images.length} média(s) récupéré(s).`);
-  }
-
-  // Mode 1 : scraper le site complet
-  async function doScrapeProduct() {
-    if (!hasSiteUrl) { toast.error("Aucun lien vers le site disponible."); return; }
+  // Mode 1 : importer via la nouvelle route API (produit complet)
+  async function doImportProduct(productUrl: string) {
+    if (!productUrl) { toast.error("Saisissez l'URL de la page produit."); return; }
     setStep("scraping");
     try {
-      const res = await fetch("/api/scrape-product", {
+      const storeId = await getStoreId();
+      if (!storeId) { toast.error("Aucun magasin actif trouvé."); setStep("choose"); return; }
+
+      const res = await fetch("/api/products/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: ad.siteUrl }),
+        body: JSON.stringify({ url: productUrl, storeId }),
       });
       const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || "Erreur de scraping");
+      if (!res.ok || data.error) throw new Error(data.error || "Erreur d'import");
 
-      const allMedia = [
-        ...(data.images || []),
-        ...(data.gifs || []),
-        ...(data.videos || []),
-      ].filter(Boolean).slice(0, 20);
-
-      await insertProduct({
-        title: data.title || title,
-        description: data.description || `<p>${adBody}</p>`,
-        images: allMedia.length > 0 ? allMedia : allImages,
-        price: data.price || "",
-        scraped: true,
-      });
+      setImportStats({ images: data.images, platform: data.platform, needsPriceCheck: data.needsPriceCheck });
+      setProductId(data.productId);
+      setStep("done");
+      toast.success(`Produit importé ! ${data.images} image(s) récupérée(s).`);
     } catch (err: any) {
-      toast.error("Erreur scraping : " + (err.message || "Erreur inconnue"));
+      toast.error("Erreur import : " + (err.message || "Erreur inconnue"));
       setStep("choose");
     }
   }
 
-  // Mode 2 : depuis la pub uniquement
+  // Mode 2 : depuis la pub uniquement (images de la pub, texte de l'annonce)
   async function doImportFromAd() {
     setStep("scraping");
     try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Non connecté");
+
+      const { data: memberships } = await supabase.from("store_members").select("store_id").eq("user_id", user.id).limit(1);
+      const storeId = memberships?.[0]?.store_id;
+      if (!storeId) throw new Error("Aucun magasin actif");
+
+      const slug = `produit-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
       const desc = [
         adBody ? `<p>${adBody.replace(/\n/g, "<br/>")}</p>` : "",
         ad.linkDescription ? `<p>${ad.linkDescription}</p>` : "",
         ad.ctaText ? `<p><strong>👉 ${ad.ctaText}</strong></p>` : "",
       ].filter(Boolean).join("\n") || `<p>${title}</p>`;
 
-      await insertProduct({
-        title,
-        description: desc,
-        images: allImages,
-        price: "",
-        scraped: false,
+      const { data: newProduct, error } = await supabase
+        .from("products")
+        .insert({
+          store_id: storeId,
+          title: title.substring(0, 200),
+          slug,
+          description: desc,
+          images: allImages.slice(0, 20),
+          status: "draft",
+        })
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      // Variante avec stock 1000
+      await supabase.from("variants").insert({
+        product_id: newProduct.id,
+        store_id: storeId,
+        title: "Défaut",
+        position: 0,
+        stock: 1000,
       });
+
+      setImportStats({ images: allImages.length, platform: "pub", needsPriceCheck: true });
+      setProductId(newProduct.id);
+      setStep("done");
+      toast.success(`Produit créé depuis la pub ! ${allImages.length} image(s).`);
     } catch (err: any) {
       toast.error("Erreur : " + (err.message || "Erreur inconnue"));
       setStep("choose");
@@ -483,28 +484,21 @@ function ImportModal({
             <div className="space-y-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">Choisissez votre mode d&apos;importation</p>
 
-              {/* Option 1 : Scraper le site */}
+              {/* Option 1 : Importer depuis une URL produit */}
               <button
-                onClick={doScrapeProduct}
-                disabled={!hasSiteUrl}
-                className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all group text-left ${
-                  hasSiteUrl
-                    ? "border-zinc-200 hover:border-indigo-400 hover:bg-indigo-50"
-                    : "border-zinc-100 opacity-40 cursor-not-allowed"
-                }`}
+                onClick={() => siteIsProductUrl ? doImportProduct(ad.siteUrl!) : setStep("url_input")}
+                className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-zinc-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all group text-left"
               >
                 <div className="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
                   <Globe className="w-6 h-6 text-indigo-600" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-zinc-800 mb-0.5">
-                    Scraper le site complet
+                    Cloner la fiche produit
                     <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-bold ml-2">RECOMMANDÉ</span>
                   </p>
                   <p className="text-[11px] text-zinc-400">
-                    {hasSiteUrl
-                      ? "Récupère le titre, la description, les images, GIFs et vidéos du site."
-                      : "⚠️ Pas de lien site pour cette pub."}
+                    {siteIsProductUrl ? "Récupère le titre, la description, les images et le prix du site." : "Collez l'URL de la page produit (ex: boutique.com/products/mon-produit)."}
                   </p>
                 </div>
                 <ArrowRight className="w-4 h-4 text-zinc-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
@@ -527,6 +521,31 @@ function ImportModal({
             </div>
           )}
 
+          {step === "url_input" && (
+            <div className="space-y-4">
+              <p className="text-sm font-semibold text-zinc-700">Collez l&apos;URL de la page produit :</p>
+              <input
+                type="url"
+                value={customUrl}
+                onChange={(e) => setCustomUrl(e.target.value)}
+                placeholder="https://boutique.com/products/mon-produit"
+                className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+              />
+              <div className="flex gap-2">
+                <button onClick={() => setStep("choose")} className="flex-1 py-2.5 rounded-xl border border-zinc-200 text-xs font-bold text-zinc-500 hover:bg-zinc-50">
+                  Retour
+                </button>
+                <button
+                  onClick={() => doImportProduct(customUrl)}
+                  disabled={!customUrl}
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  Importer →
+                </button>
+              </div>
+            </div>
+          )}
+
           {step === "scraping" && (
             <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
               <div className="relative">
@@ -536,8 +555,8 @@ function ImportModal({
                 <div className="absolute inset-0 rounded-full border-2 border-indigo-400 animate-spin" style={{ borderTopColor: "transparent" }} />
               </div>
               <div>
-                <p className="text-sm font-bold text-zinc-800">Récupération du site en cours…</p>
-                <p className="text-[11px] text-zinc-400 mt-1">Extraction du titre, description, images, GIFs et vidéos</p>
+                <p className="text-sm font-bold text-zinc-800">Clonage de la fiche produit…</p>
+                <p className="text-[11px] text-zinc-400 mt-1">Extraction du titre, description, images et prix</p>
               </div>
             </div>
           )}
@@ -550,16 +569,14 @@ function ImportModal({
               <div>
                 <p className="text-base font-bold text-zinc-800 mb-1">Produit importé ! ✅</p>
                 <div className="flex flex-wrap justify-center gap-2 mt-2">
-                  {importStats.images > 0 && <span className="text-[9px] font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full">{importStats.images} média(s)</span>}
-                  {importStats.scraped && <span className="text-[9px] font-bold px-2 py-1 bg-emerald-50 text-emerald-600 rounded-full">🌐 Site scrapé</span>}
+                  {importStats.images > 0 && <span className="text-[9px] font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full">{importStats.images} image(s)</span>}
+                  {importStats.platform && <span className="text-[9px] font-bold px-2 py-1 bg-emerald-50 text-emerald-600 rounded-full">🌐 {importStats.platform}</span>}
+                  {importStats.needsPriceCheck && <span className="text-[9px] font-bold px-2 py-1 bg-amber-50 text-amber-600 rounded-full">⚠️ Vérifier le prix</span>}
                 </div>
                 <p className="text-[11px] text-zinc-400 mt-2">Le produit est en brouillon dans votre catalogue.</p>
               </div>
               <div className="flex gap-3 w-full mt-2">
-                <button
-                  onClick={onClose}
-                  className="flex-1 py-3 rounded-xl border border-zinc-200 text-[11px] font-bold uppercase tracking-widest text-zinc-500 hover:bg-zinc-50 transition-colors"
-                >
+                <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-zinc-200 text-[11px] font-bold uppercase tracking-widest text-zinc-500 hover:bg-zinc-50 transition-colors">
                   Fermer
                 </button>
                 <button
