@@ -754,12 +754,24 @@ function SpyPubsContent() {
   const selectedCountry = searchParams.get("country") ?? "ALL";
   const mediaFilter = searchParams.get("media") ?? "ALL";
 
+  // État local pour la frappe dans le champ — NE PAS lier directement à l'URL
+  const [inputValue, setInputValue] = useState(searchTerm);
+
+  // Sync inputValue si l'URL change depuis l'extérieur (ex: clic sur une niche)
+  const prevSearchTerm = useRef(searchTerm);
+  useEffect(() => {
+    if (searchTerm !== prevSearchTerm.current) {
+      setInputValue(searchTerm);
+      prevSearchTerm.current = searchTerm;
+    }
+  }, [searchTerm]);
+
   function setActiveNiche(v: string) {
     const p = new URLSearchParams(searchParams.toString());
     p.set("niche", v);
     router.replace(`/dashboard/spy-pubs?${p}`, { scroll: false });
   }
-  function setSearchTerm(v: string) {
+  function setSearchTermInUrl(v: string) {
     const p = new URLSearchParams(searchParams.toString());
     p.set("q", v);
     router.replace(`/dashboard/spy-pubs?${p}`, { scroll: false });
@@ -779,10 +791,18 @@ function SpyPubsContent() {
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const [ads, setAds] = useState<AdItem[]>([]);
+  const [ads, setAds] = useState<AdItem[]>(() => {
+    // Restaurer les résultats depuis sessionStorage au retour
+    try {
+      const saved = sessionStorage.getItem('spy-pubs-ads');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [totalFound, setTotalFound] = useState(0);
+  const [totalFound, setTotalFound] = useState(() => {
+    try { return Number(sessionStorage.getItem('spy-pubs-total') ?? '0'); } catch { return 0; }
+  });
   const [totalInCountry, setTotalInCountry] = useState<number | null>(null);
   const [activeTerm, setActiveTerm] = useState(DEFAULT_KEYWORD);
   const [selectedAd, setSelectedAd] = useState<AdItem | null>(null);
@@ -857,6 +877,11 @@ function SpyPubsContent() {
       setAds(newAds);
       setTotalFound(newAds.length);
       setTotalInCountry(data.totalInCountry ?? null);
+      // Persister pour restauration au retour
+      try {
+        sessionStorage.setItem('spy-pubs-ads', JSON.stringify(newAds));
+        sessionStorage.setItem('spy-pubs-total', String(newAds.length));
+      } catch { /* silencieux si trop volumineux */ }
     } catch (err: any) {
       setError(err.message);
       toast.error("Erreur lors de la recherche");
@@ -896,14 +921,16 @@ function SpyPubsContent() {
 
   const handleNicheClick = (niche: typeof NICHES[0]) => {
     setActiveNiche(niche.key);
-    setSearchTerm(niche.keywords);
+    setInputValue(niche.keywords);
+    setSearchTermInUrl(niche.keywords);
     doSearch({ term: niche.keywords });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setActiveNiche("all");
-    doSearch({});
+    setSearchTermInUrl(inputValue);
+    doSearch({ term: inputValue });
   };
 
   const countryLabel = ALL_COUNTRIES.find(c => c.code === selectedCountry)?.label || "🌍 Monde entier";
@@ -995,8 +1022,8 @@ function SpyPubsContent() {
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
                   <input
                     type="text"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
+                    value={inputValue}
+                    onChange={e => setInputValue(e.target.value)}
                     placeholder='Ex : "beauté", "livraison gratuite", "50% off"…'
                     className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-800 placeholder-zinc-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
                   />
