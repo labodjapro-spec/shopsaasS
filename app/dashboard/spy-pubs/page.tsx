@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, Suspense } from "react";
 import {
   Search, Globe, Play, ExternalLink, Loader2,
   AlertCircle, ChevronDown, Eye, Clock, RefreshCw,
@@ -9,7 +9,7 @@ import {
   Flame, Sparkles, TrendingUp, Telescope,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 /* ─────────────────────────────────────────────
@@ -580,7 +580,12 @@ function ImportModal({
                   Fermer
                 </button>
                 <button
-                  onClick={() => { onClose(); router.push(`/dashboard/products/${productId}`); }}
+                  onClick={() => {
+                    // Sauvegarder la position de scroll avant de naviguer
+                    sessionStorage.setItem('spy-pubs-scroll', String(window.scrollY));
+                    onClose();
+                    router.push(`/dashboard/products/${productId}?returnTo=${encodeURIComponent(window.location.href)}`);
+                  }}
                   className="flex-1 py-3 rounded-xl text-[11px] font-bold uppercase tracking-widest text-white shadow-sm hover:-translate-y-0.5 transition-all active:scale-95"
                   style={{ background: "var(--dashboard-accent)" }}
                 >
@@ -730,13 +735,45 @@ function AdSkeleton() {
    PAGE PRINCIPALE
 ───────────────────────────────────────────── */
 export default function SpyPubsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-zinc-400">Chargement…</div>}>
+      <SpyPubsContent />
+    </Suspense>
+  )
+}
+
+function SpyPubsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const DEFAULT_KEYWORD = "livraison gratuite";
 
-  const [activeNiche, setActiveNiche] = useState("all");
-  const [searchTerm, setSearchTerm] = useState(DEFAULT_KEYWORD);
-  const [selectedCountry, setSelectedCountry] = useState("ALL");
-  const [mediaFilter, setMediaFilter] = useState("ALL");
+  // Filtres persistés dans l'URL
+  const activeNiche = searchParams.get("niche") ?? "all";
+  const searchTerm = searchParams.get("q") ?? DEFAULT_KEYWORD;
+  const selectedCountry = searchParams.get("country") ?? "ALL";
+  const mediaFilter = searchParams.get("media") ?? "ALL";
+
+  function setActiveNiche(v: string) {
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("niche", v);
+    router.replace(`/dashboard/spy-pubs?${p}`, { scroll: false });
+  }
+  function setSearchTerm(v: string) {
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("q", v);
+    router.replace(`/dashboard/spy-pubs?${p}`, { scroll: false });
+  }
+  function setSelectedCountry(v: string) {
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("country", v);
+    router.replace(`/dashboard/spy-pubs?${p}`, { scroll: false });
+  }
+  function setMediaFilter(v: string) {
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("media", v);
+    router.replace(`/dashboard/spy-pubs?${p}`, { scroll: false });
+  }
+
   const [countrySearch, setCountrySearch] = useState("");
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -765,6 +802,17 @@ export default function SpyPubsPage() {
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Restaurer la position de scroll au retour depuis la page produit
+  useEffect(() => {
+    const savedScroll = sessionStorage.getItem('spy-pubs-scroll');
+    if (savedScroll) {
+      sessionStorage.removeItem('spy-pubs-scroll');
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: Number(savedScroll), behavior: 'instant' });
+      });
+    }
   }, []);
 
   // Charger les favoris depuis Supabase
