@@ -153,9 +153,9 @@ export default function Canvas({
       <div className="flex min-h-0 items-start justify-center px-2 py-4 sm:px-4 sm:py-6" onClick={(e) => e.stopPropagation()}>
         {previewMode === 'mobile' ? (
           <div
-            className="relative mx-auto w-full max-w-[393px] flex-shrink-0 overflow-hidden rounded-[20px] border-[3px] border-[#1a1a1a] shadow-xl @container"
+            className="relative mx-auto flex-shrink-0 overflow-hidden rounded-[20px] border-[3px] border-[#1a1a1a] shadow-xl @container"
             style={{
-              width: 'min(393px, 100%)',
+              width: 'min(393px, calc(100% - 8px))',
               height: 'min(852px, calc(100dvh - 120px))',
               background: styles.outer.background,
             }}

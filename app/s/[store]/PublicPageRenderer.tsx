@@ -29,7 +29,7 @@ export default function PublicPageRenderer({ data, products, storeId, pixelId }:
   }
 
   return (
-    <>
+    <div className="overflow-x-hidden w-full">
       {/* Pixel Meta navigateur — PageView automatique */}
       <StoreTracking pixelId={pixelId} />
       <TemplateLayoutRenderer
@@ -40,6 +40,6 @@ export default function PublicPageRenderer({ data, products, storeId, pixelId }:
         enableReveal={true}
         allProducts={products}
       />
-    </>
+    </div>
   )
 }

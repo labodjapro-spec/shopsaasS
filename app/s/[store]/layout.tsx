@@ -32,7 +32,7 @@ export default async function StoreLayout({
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white overflow-x-hidden">
       {children}
       {whatsapp && (
         <a
