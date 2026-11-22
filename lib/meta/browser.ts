@@ -23,8 +23,34 @@ export function trackMetaBrowserEvent(
   data: Record<string, unknown>,
   eventId?: string,
 ) {
-  if (typeof window === 'undefined' || !window.shopSaaSMetaTrack) return
-  window.shopSaaSMetaTrack(eventName, data, eventId)
+  if (typeof window === 'undefined') return
+
+  // Si shopSaaSMetaTrack est disponible, l'utiliser directement
+  if (window.shopSaaSMetaTrack) {
+    window.shopSaaSMetaTrack(eventName, data, eventId)
+    return
+  }
+
+  // Fallback : fbq global si disponible (cas où le pixel est chargé mais pas shopSaaSMetaTrack)
+  const fbq = (window as any).fbq
+  if (fbq) {
+    if (eventId) fbq('track', eventName, data, { eventID: eventId })
+    else fbq('track', eventName, data)
+    return
+  }
+
+  // Dernier recours : attendre que fbq soit chargé (max 5s)
+  let attempts = 0
+  const interval = window.setInterval(() => {
+    attempts++
+    const fbqDelayed = (window as any).fbq
+    if (fbqDelayed) {
+      window.clearInterval(interval)
+      if (eventId) fbqDelayed('track', eventName, data, { eventID: eventId })
+      else fbqDelayed('track', eventName, data)
+    }
+    if (attempts >= 50) window.clearInterval(interval) // abandon après 5s
+  }, 100)
 }
 
 declare global {

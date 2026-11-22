@@ -104,7 +104,7 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
             currency={selectedProduct?.currency || currency}
           />
         )}
-        <PublicPageRenderer data={builderJson} products={products} storeId={parentStore.id} />
+        <PublicPageRenderer data={builderJson} products={products} storeId={parentStore.id} pixelId={pixelId || null} />
       </>
     )
   }
