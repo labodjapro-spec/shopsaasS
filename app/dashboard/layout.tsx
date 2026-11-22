@@ -28,6 +28,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (can(permissions, 'orders.read')) {
     items.push({ href: '/dashboard/orders', label: 'Commandes', icon: 'orders' })
   }
+  if (can(permissions, 'analytics.read')) {
+    items.push({ href: '/dashboard/comptabilite', label: 'Comptabilité', icon: 'orders' })
+  }
   if (can(permissions, 'products.read')) items.push({ href: '/dashboard/products', label: 'Produits', icon: 'products' })
   if (can(permissions, 'products.read')) items.push({ href: '/dashboard/spy-pubs', label: 'Spy Pubs 🔥', icon: 'products' })
   if (can(permissions, 'pages.write')) items.push({ href: `/boutiques?parent=${store.id}`, label: 'Pages', icon: 'products' })
