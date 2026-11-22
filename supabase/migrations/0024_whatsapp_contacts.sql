@@ -35,8 +35,8 @@ CREATE POLICY "settings_write_whatsapp_contacts"
       WHERE sm.store_id = whatsapp_contacts.store_id
         AND sm.user_id = auth.uid()
         AND (
-          r.permissions::jsonb @> '["*"]'::jsonb
-          OR r.permissions::jsonb @> '["settings.write"]'::jsonb
+          '*' = ANY(r.permissions)
+          OR 'settings.write' = ANY(r.permissions)
         )
     )
   );
