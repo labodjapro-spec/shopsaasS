@@ -34,6 +34,9 @@ CREATE POLICY "settings_write_whatsapp_contacts"
       JOIN public.roles r ON r.id = sm.role_id
       WHERE sm.store_id = whatsapp_contacts.store_id
         AND sm.user_id = auth.uid()
-        AND (r.permissions @> '["*"]' OR r.permissions @> '["settings.write"]')
+        AND (
+          r.permissions::jsonb @> '["*"]'::jsonb
+          OR r.permissions::jsonb @> '["settings.write"]'::jsonb
+        )
     )
   );
