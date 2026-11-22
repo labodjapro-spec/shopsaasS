@@ -1,13 +1,27 @@
 'use client'
 
 import Script from 'next/script'
+import { useEffect } from 'react'
 
-/** Meta (Facebook) Pixel — PageView + événements e-commerce sur la boutique publique.
- *  Utilise trackSingle() pour supporter plusieurs pixels simultanément (multi-boutiques).
- *  Note : ce composant est utilisé sur les pages builder (PublicPageRenderer).
- *  Les pages /s/[store]/p/[slug] utilisent MetaPixelTracker à la place. */
+/** Meta Pixel — PageView + window.shopSaaSMetaTrack pour les événements e-commerce.
+ *  Utilisé sur les pages builder (PublicPageRenderer).
+ *  Utilise trackSingle() pour supporter plusieurs pixels simultanément. */
 export default function StoreTracking({ pixelId }: { pixelId?: string | null }) {
   const id = pixelId?.trim()
+
+  // Expose window.shopSaaSMetaTrack dès que le pixel est prêt
+  // Cela permet à OrderFormRender d'envoyer Purchase avec le bon pixelId
+  useEffect(() => {
+    if (!id) return
+    window.shopSaaSMetaTrack = (eventName: string, data: Record<string, any> = {}, eventId?: string) => {
+      const fbq = (window as any).fbq
+      if (!fbq) return
+      if (eventId) fbq('trackSingle', id, eventName, data, { eventID: eventId })
+      else fbq('trackSingle', id, eventName, data)
+    }
+    return () => { window.shopSaaSMetaTrack = undefined }
+  }, [id])
+
   if (!id) return null
 
   return (
@@ -37,8 +51,13 @@ export default function StoreTracking({ pixelId }: { pixelId?: string | null }) 
   )
 }
 
-/** Envoie un événement Meta avec trackSingle (multi-pixel safe).
- *  Utilise toujours trackSingle pour éviter la confusion entre boutiques. */
+declare global {
+  interface Window {
+    shopSaaSMetaTrack?: (eventName: string, data?: Record<string, any>, eventId?: string) => void
+  }
+}
+
+/** Envoie un événement Meta avec trackSingle (multi-pixel safe). */
 export function trackFbEvent(pixelId: string, event: string, params?: Record<string, unknown>) {
   if (typeof window !== 'undefined' && (window as any).fbq) {
     (window as any).fbq('trackSingle', pixelId, event, params)
