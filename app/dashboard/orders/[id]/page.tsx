@@ -5,6 +5,7 @@ import { Card } from '@/components/ui'
 import { formatMoney } from '@/lib/utils'
 import { saveOrderNote } from '../actions'
 import StatusButtons from './StatusButtons'
+import WhatsappShare from './WhatsappShare'
 import { formatScheduledDateFr, parseScheduleNote, resolveOrderScheduledAt } from '@/lib/orders/scheduled'
 import { ArrowLeft, Phone, MapPin, User, Package, Clock, CheckCircle, XCircle, Truck, RotateCcw, AlertCircle } from 'lucide-react'
 
@@ -49,6 +50,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       .order('created_at', { ascending: false }),
   ])
   if (!order) notFound()
+
+  // Charger les contacts WhatsApp de la boutique
+  const { data: waContacts } = await supabase
+    .from('whatsapp_contacts')
+    .select('id, name, phone, role, template')
+    .eq('store_id', store.id)
+    .order('position')
+    .order('created_at')
 
   const currency = order.markets?.currency ?? 'XOF'
   const style = STATUS_STYLES[order.status] ?? STATUS_STYLES.new
@@ -183,6 +192,30 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               currentScheduleNote={cleanNote}
             />
           </Card>
+
+          {/* Partage WhatsApp */}
+          {(waContacts ?? []).length > 0 && (
+            <Card>
+              <h2 className="font-semibold text-zinc-900 mb-3">Partager cette commande</h2>
+              <WhatsappShare
+                contacts={(waContacts ?? []) as any}
+                order={{
+                  orderNumber: order.order_number,
+                  customerName: order.customer_name,
+                  customerPhone: order.customer_phone ?? '',
+                  customerCity: order.customer_city ?? '',
+                  customerAddress: order.customer_address ?? '',
+                  total: formatMoney(order.total, currency),
+                  currency,
+                  status: STATUS_LABELS[order.status] ?? order.status,
+                  productLines: Array.isArray(order.lines) && order.lines.length > 0
+                    ? order.lines.map((l: any) => `${l.title ?? l.product_title ?? 'Produit'} ×${l.quantity ?? 1}`).join(', ')
+                    : 'Produit',
+                  note: order.note,
+                }}
+              />
+            </Card>
+          )}
 
           {/* Historique */}
           <Card>

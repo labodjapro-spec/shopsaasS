@@ -8,11 +8,20 @@ import Link from 'next/link'
 import { Users } from 'lucide-react'
 import AppSetup from '@/app/dashboard/app/AppSetup'
 import AppearanceSettings from '@/components/dashboard/AppearanceSettings'
+import WhatsappContactsManager from './whatsapp-contacts/WhatsappContactsManager'
 
 export default async function SettingsPage() {
-  const { store, permissions } = await requireStore()
+  const { store, permissions, supabase } = await requireStore()
   const canSettings = can(permissions, 'settings.write')
   const canTeam = can(permissions, 'team.write')
+
+  // Charger les contacts WhatsApp
+  const { data: waContacts } = await supabase
+    .from('whatsapp_contacts')
+    .select('id, name, phone, role, template')
+    .eq('store_id', store.id)
+    .order('position')
+    .order('created_at')
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -60,6 +69,16 @@ export default async function SettingsPage() {
               Gérer
             </Link>
           </div>
+        </Card>
+      )}
+
+      {canSettings && (
+        <Card>
+          <h2 className="mb-1 font-semibold text-zinc-900">Contacts WhatsApp</h2>
+          <p className="mb-4 text-sm text-zinc-500">
+            Closers, livreurs et groupes à qui envoyer les commandes directement depuis la fiche commande.
+          </p>
+          <WhatsappContactsManager contacts={(waContacts ?? []) as any} />
         </Card>
       )}
 
