@@ -59,6 +59,26 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     .order('position')
     .order('created_at')
 
+  // Enrichir les lignes avec le titre du produit si absent (commandes via variant_id)
+  const lines: any[] = Array.isArray(order.lines) ? order.lines : []
+  const variantIds = lines
+    .filter((l: any) => l.variant_id && !l.title)
+    .map((l: any) => l.variant_id)
+  let variantTitles: Record<string, string> = {}
+  if (variantIds.length > 0) {
+    const { data: variants } = await supabase
+      .from('variants')
+      .select('id, products(title)')
+      .in('id', variantIds)
+    for (const v of variants ?? []) {
+      variantTitles[v.id] = (v.products as any)?.title ?? 'Produit'
+    }
+  }
+  const enrichedLines = lines.map((l: any) => ({
+    ...l,
+    title: l.title || variantTitles[l.variant_id] || 'Produit',
+  }))
+
   const currency = order.markets?.currency ?? 'XOF'
   const style = STATUS_STYLES[order.status] ?? STATUS_STYLES.new
   const StatusIcon = style.icon
@@ -145,7 +165,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </h2>
             {order.lines && Array.isArray(order.lines) && order.lines.length > 0 ? (
               <div className="divide-y divide-zinc-100">
-                {order.lines.map((line: any, i: number) => (
+                {enrichedLines.map((line: any, i: number) => (
                   <div key={i} className="flex items-center justify-between py-3">
                     <div className="flex items-center gap-3">
                       {line.image && (
@@ -208,8 +228,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   total: formatMoney(order.total, currency),
                   currency,
                   status: STATUS_LABELS[order.status] ?? order.status,
-                  productLines: Array.isArray(order.lines) && order.lines.length > 0
-                    ? order.lines.map((l: any) => `${l.title ?? l.product_title ?? 'Produit'} ×${l.quantity ?? 1}`).join(', ')
+                  productLines: enrichedLines.length > 0
+                    ? enrichedLines.map((l: any) => `${l.title ?? 'Produit'} ×${l.quantity ?? 1}`).join(', ')
                     : 'Produit',
                   note: order.note,
                 }}
