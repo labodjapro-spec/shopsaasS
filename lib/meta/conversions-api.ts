@@ -7,6 +7,8 @@ const META_GRAPH_VERSION = 'v25.0'
 type MetaConfig = {
   pixel_id: string
   access_token_secret_id: string | null
+  test_event_code?: string | null
+  test_mode?: boolean | null
 }
 
 export type MetaRequestContext = {
@@ -56,7 +58,7 @@ function sourceUrl(value: string | null | undefined, storeSlug: string) {
 async function getConfig(admin: SupabaseClient, storeId: string) {
   const { data, error } = await admin
     .from('store_meta_integrations')
-    .select('pixel_id, access_token_secret_id')
+    .select('pixel_id, access_token_secret_id, test_event_code, test_mode')
     .eq('store_id', storeId)
     .maybeSingle()
   if (error) throw error
@@ -85,8 +87,12 @@ async function sendEvent(
   const url = new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/${encodeURIComponent(config.pixel_id)}/events`)
   url.searchParams.set('access_token', accessToken)
 
-  // TEST MODE — retire cette ligne en production
-  const testEventCode = process.env.META_TEST_EVENT_CODE
+  // TEST MODE — priorité : config boutique > variable d'env globale
+  // La variable d'env globale est un fallback de dev uniquement, jamais en production
+  const testEventCode = config.test_mode && config.test_event_code
+    ? config.test_event_code
+    : (process.env.NODE_ENV !== 'production' ? (process.env.META_TEST_EVENT_CODE || null) : null)
+
   const payload: Record<string, unknown> = {
     data: [event],
     ...(testEventCode ? { test_event_code: testEventCode } : {}),
