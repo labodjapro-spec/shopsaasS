@@ -3,6 +3,7 @@
 import Script from 'next/script'
 
 /** Meta (Facebook) Pixel — PageView + événements e-commerce sur la boutique publique.
+ *  Utilise trackSingle() pour supporter plusieurs pixels simultanément (multi-boutiques).
  *  Note : ce composant est utilisé sur les pages builder (PublicPageRenderer).
  *  Les pages /s/[store]/p/[slug] utilisent MetaPixelTracker à la place. */
 export default function StoreTracking({ pixelId }: { pixelId?: string | null }) {
@@ -11,7 +12,7 @@ export default function StoreTracking({ pixelId }: { pixelId?: string | null }) 
 
   return (
     <>
-      <Script id="fb-pixel" strategy="afterInteractive">{`
+      <Script id={`fb-pixel-${id}`} strategy="afterInteractive">{`
         !function(f,b,e,v,n,t,s)
         {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
         n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -36,8 +37,10 @@ export default function StoreTracking({ pixelId }: { pixelId?: string | null }) 
   )
 }
 
-export function trackFbEvent(event: string, params?: Record<string, unknown>) {
-  if (typeof window !== 'undefined' && window.fbq) {
-    window.fbq('track', event, params)
+/** Envoie un événement Meta avec trackSingle (multi-pixel safe).
+ *  Utilise toujours trackSingle pour éviter la confusion entre boutiques. */
+export function trackFbEvent(pixelId: string, event: string, params?: Record<string, unknown>) {
+  if (typeof window !== 'undefined' && (window as any).fbq) {
+    (window as any).fbq('trackSingle', pixelId, event, params)
   }
 }

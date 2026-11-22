@@ -5,9 +5,9 @@ import MetaPixelTracker from './p/[slug]/MetaPixelTracker'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { unstable_cache } from 'next/cache'
 
-// ── Charge le Pixel ID depuis le cache (60s) ───────────────────────────────
-const loadMetaPixelId = unstable_cache(
-  async (storeId: string) => {
+// ── Charge le Pixel ID depuis le cache (60s) — clé unique par boutique ──────
+const loadMetaPixelIdForStore = (storeId: string) => unstable_cache(
+  async () => {
     try {
       const admin = createAdminClient()
       const { data } = await admin
@@ -21,9 +21,9 @@ const loadMetaPixelId = unstable_cache(
       return ''
     }
   },
-  ['meta-pixel-id'],
-  { revalidate: 60, tags: ['meta-pixel'] }
-)
+  [`meta-pixel-id-${storeId}`],  // clé unique par boutique
+  { revalidate: 60, tags: [`meta-pixel-${storeId}`] }
+)()
 
 export default async function StorePublicPage({ params }: { params: Promise<{ store: string }> }) {
   const { store: slug } = await params
@@ -91,7 +91,7 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
       },
     }
     const selectedProduct = products.find((item: any) => item.id === builderJson?.selectedProductId) ?? products[0]
-    const pixelId = await loadMetaPixelId(parentStore.id)
+    const pixelId = await loadMetaPixelIdForStore(parentStore.id)
 
     return (
       <>
@@ -140,7 +140,7 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
       .eq('store_id', store.id)
       .eq('status', 'active')
       .order('created_at', { ascending: false }),
-    loadMetaPixelId(store.id),
+    loadMetaPixelIdForStore(store.id),
   ])
 
   if (!storePage?.builder_json) {
@@ -207,6 +207,7 @@ export default async function StorePublicPage({ params }: { params: Promise<{ st
         data={builderJson}
         products={products}
         storeId={store.id}
+        pixelId={pixelId || null}
       />
     </>
   )
