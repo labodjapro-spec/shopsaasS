@@ -87,12 +87,22 @@ export default function WhatsappShare({
     setMsg('')
   }
 
-  // Trier : closers → livreurs → groupes
+  // Trier : closers → livreurs → groupes + toujours ajouter une entrée groupe générique à la fin
   const sorted = [
     ...contacts.filter(c => c.role === 'closer'),
     ...contacts.filter(c => c.role === 'livreur'),
     ...contacts.filter(c => c.role === 'groupe'),
   ]
+
+  // Entrée groupe générique toujours présente (pas besoin de configurer un numéro)
+  const groupeGenerique: Contact = {
+    id: '__groupe__',
+    name: 'Envoyer dans un groupe',
+    phone: '',
+    role: 'groupe',
+    template: null,
+  }
+  const finalList = [...sorted, groupeGenerique]
 
   return (
     <>
@@ -144,7 +154,7 @@ export default function WhatsappShare({
                     À qui envoyer cette commande ?
                   </p>
                   <div className="space-y-2">
-                    {sorted.map((c) => {
+                    {finalList.map((c) => {
                       const cfg = ROLE_CONFIG[c.role]
                       const Icon = cfg.icon
                       return (
