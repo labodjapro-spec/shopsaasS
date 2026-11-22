@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { MessageCircle, Send, X, Phone, Truck, Users, ChevronDown, ChevronUp } from 'lucide-react'
+import { MessageCircle, Send, X, Phone, Truck, Users, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react'
 
 type Contact = {
   id: string
@@ -31,9 +31,9 @@ const ROLE_CONFIG = {
 }
 
 const DEFAULT_TEMPLATES: Record<string, string> = {
-  closer: `Commande à closer :\n👤 Client : {nom}\n📞 Tél : {tel}\n📦 Produit : {produit}\n🏙️ Ville : {adresse}\n💰 Montant : {montant}\n🔖 Réf : {ref}\n📋 Statut : {statut}`,
-  livreur: `🚚 Nouvelle livraison :\n👤 {nom}\n📞 {tel}\n📍 {adresse}\n📦 {produit}\n💰 {montant}\n🔖 Réf : {ref}`,
-  groupe: `✅ Commande confirmée\n👤 {nom} · {tel}\n📍 {adresse}\n📦 {produit}\n💰 {montant}\n🔖 {ref}`,
+  closer: `Commande à confirmer 📋\n\n👤 Client : {nom}\n📞 Téléphone : {tel}\n📍 Adresse : {adresse}\n\n📦 Produit : {produit}\n💰 À encaisser : {montant}\n\n🔖 Réf : {ref}\n📋 Statut : {statut}`,
+  livreur: `🚚 Livraison à effectuer\n\n👤 {nom}\n📞 {tel}\n📍 {adresse}\n\n📦 {produit}\n💵 À encaisser : {montant}\n\n🔖 Réf : {ref}`,
+  groupe: `✅ Nouvelle commande confirmée\n\n👤 {nom} · 📞 {tel}\n📍 {adresse}\n📦 {produit}\n💰 {montant}\n🔖 {ref}`,
 }
 
 function buildMessage(template: string, order: OrderInfo): string {
@@ -50,6 +50,78 @@ function buildMessage(template: string, order: OrderInfo): string {
 function waLink(phone: string, message: string): string {
   const digits = phone.replace(/[^\d+]/g, '')
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+}
+
+/** Carte d'un contact avec message éditable avant envoi */
+function ContactRow({ contact, defaultMsg }: { contact: Contact; defaultMsg: string }) {
+  const [msg, setMsg] = useState(defaultMsg)
+  const [showEdit, setShowEdit] = useState(false)
+
+  return (
+    <div className="px-4 py-3 space-y-2">
+      {/* En-tête contact + bouton envoyer */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-zinc-800 truncate">{contact.name}</p>
+          <p className="text-xs text-zinc-400">{contact.phone}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowEdit(v => !v)}
+            className="flex size-8 items-center justify-center rounded-xl border border-zinc-200 text-zinc-400 hover:bg-zinc-50 hover:text-zinc-700 transition"
+            title="Modifier le message"
+          >
+            ✏️
+          </button>
+          <a
+            href={waLink(contact.phone, msg)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-xl bg-[#25D366] px-3 py-2 text-xs font-bold text-white hover:bg-[#1ebe5d] transition active:scale-95"
+          >
+            <Send className="size-3" />
+            Envoyer
+          </a>
+        </div>
+      </div>
+
+      {/* Zone d'édition du message */}
+      {showEdit && (
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-200 bg-white">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Message à envoyer</span>
+            <button
+              type="button"
+              onClick={() => setMsg(defaultMsg)}
+              className="flex items-center gap-1 text-[10px] font-semibold text-zinc-400 hover:text-violet-600 transition"
+              title="Réinitialiser"
+            >
+              <RotateCcw className="size-3" />
+              Réinitialiser
+            </button>
+          </div>
+          <textarea
+            value={msg}
+            onChange={e => setMsg(e.target.value)}
+            rows={8}
+            className="w-full bg-zinc-50 px-3 py-2.5 text-xs text-zinc-700 font-mono leading-relaxed resize-none outline-none focus:bg-white transition"
+          />
+        </div>
+      )}
+
+      {/* Aperçu collapsed si pas en édition */}
+      {!showEdit && (
+        <button
+          type="button"
+          onClick={() => setShowEdit(true)}
+          className="text-[11px] text-zinc-400 hover:text-zinc-600 transition text-left"
+        >
+          👁 Voir / modifier le message →
+        </button>
+      )}
+    </div>
+  )
 }
 
 export default function WhatsappShare({
@@ -141,35 +213,13 @@ export default function WhatsappShare({
                         <div className="divide-y divide-zinc-50">
                           {list.map((c) => {
                             const tpl = c.template || DEFAULT_TEMPLATES[c.role] || DEFAULT_TEMPLATES.closer
-                            const msg = buildMessage(tpl, order)
-                            const link = waLink(c.phone, msg)
+                            const defaultMsg = buildMessage(tpl, order)
                             return (
-                              <div key={c.id} className="px-4 py-3">
-                                <div className="flex items-center justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-bold text-zinc-800 truncate">{c.name}</p>
-                                    <p className="text-xs text-zinc-400">{c.phone}</p>
-                                  </div>
-                                  <a
-                                    href={link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex shrink-0 items-center gap-1.5 rounded-xl bg-[#25D366] px-3 py-2 text-xs font-bold text-white hover:bg-[#1ebe5d] transition active:scale-95"
-                                  >
-                                    <Send className="size-3" />
-                                    Envoyer
-                                  </a>
-                                </div>
-                                {/* Aperçu du message */}
-                                <details className="mt-2">
-                                  <summary className="text-[11px] text-zinc-400 cursor-pointer hover:text-zinc-600 select-none">
-                                    Voir le message →
-                                  </summary>
-                                  <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-zinc-50 p-3 text-[11px] text-zinc-600 font-sans leading-relaxed border border-zinc-100">
-                                    {msg}
-                                  </pre>
-                                </details>
-                              </div>
+                              <ContactRow
+                                key={c.id}
+                                contact={c}
+                                defaultMsg={defaultMsg}
+                              />
                             )
                           })}
                         </div>
@@ -181,7 +231,7 @@ export default function WhatsappShare({
 
             <div className="px-4 pb-6">
               <p className="text-center text-xs text-zinc-400">
-                WhatsApp s&apos;ouvrira avec le message pré-rempli. Tu pourras le modifier avant d&apos;envoyer.
+                Clique sur ✏️ pour modifier le message avant d&apos;envoyer.
               </p>
             </div>
           </div>
