@@ -365,6 +365,7 @@ export default async function DashboardHome({
         )}
 
         {/* Dernières commandes */}
+        {recentOrders.length > 0 && (
           <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden mb-6">
             <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100">
               <div className="flex items-center gap-2">
