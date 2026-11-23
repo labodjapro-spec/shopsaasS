@@ -5,6 +5,7 @@ import { formatMoney } from '@/lib/utils'
 import { PageHeader } from '@/components/ui'
 import { DateRange } from '@/app/dashboard/DateRange'
 import ComptaCharts from './ComptaCharts'
+import Link from 'next/link'
 
 const STATUS_COLORS: Record<string, string> = {
   new:         '#8b5cf6',
@@ -26,6 +27,17 @@ const STATUS_LABELS: Record<string, string> = {
   delivered:   'Livrées',
   cancelled:   'Annulées',
   returned:    'Retournées',
+}
+
+const STATUS_TINTS: Record<string, { tint: string; text: string; dot: string }> = {
+  new:         { tint: 'bg-violet-50',  text: 'text-violet-800',  dot: 'bg-violet-500' },
+  confirmed:   { tint: 'bg-emerald-50', text: 'text-emerald-800', dot: 'bg-emerald-500' },
+  unreachable: { tint: 'bg-orange-50',  text: 'text-orange-800',  dot: 'bg-orange-500' },
+  scheduled:   { tint: 'bg-blue-50',    text: 'text-blue-800',    dot: 'bg-blue-500' },
+  shipped:     { tint: 'bg-amber-50',   text: 'text-amber-800',   dot: 'bg-amber-500' },
+  delivered:   { tint: 'bg-green-50',   text: 'text-green-800',   dot: 'bg-green-600' },
+  cancelled:   { tint: 'bg-red-50',     text: 'text-red-800',     dot: 'bg-red-500' },
+  returned:    { tint: 'bg-zinc-100',   text: 'text-zinc-800',    dot: 'bg-zinc-500' },
 }
 
 export default async function ComptabilitePage({
@@ -157,6 +169,45 @@ export default async function ComptabilitePage({
         byStatus={byStatus}
         currency={currency}
       />
+
+      {/* ── Cartes par statut — cliquables vers commandes filtrées ── */}
+      <div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="font-bold text-zinc-900">Commandes par statut</h2>
+          <Link href="/dashboard/orders" className="inline-flex items-center gap-1 text-sm font-semibold text-violet-700 hover:text-violet-900">
+            Voir toutes <span aria-hidden>→</span>
+          </Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {Object.keys(STATUS_LABELS).map(key => {
+            const s = byStatus.find(x => x.key === key) ?? { key, label: STATUS_LABELS[key], color: STATUS_COLORS[key], count: 0, total: 0 }
+            const tint = STATUS_TINTS[key] ?? { tint: 'bg-zinc-50', text: 'text-zinc-800', dot: 'bg-zinc-400' }
+            return (
+              <Link
+                key={key}
+                href={`/dashboard/orders?status=${key}&range=${range}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}`}
+                className="group rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md"
+              >
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+                    <span className={`size-2.5 rounded-full ${tint.dot}`} />
+                    {s.label}
+                  </span>
+                  <span className={`rounded-lg px-2 py-0.5 text-xs font-bold ${tint.tint} ${tint.text}`}>
+                    {s.count}
+                  </span>
+                </div>
+                <p className={`text-xl font-black tracking-tight ${tint.text}`}>
+                  {formatMoney(s.total, currency)}
+                </p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  {s.count === 0 ? 'Aucune commande' : `${s.count} commande${s.count > 1 ? 's' : ''} · ouvrir`}
+                </p>
+              </Link>
+            )
+          })}
+        </div>
+      </div>
 
       {/* ── Répartition par statut ── */}
       <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
