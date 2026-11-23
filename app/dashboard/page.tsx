@@ -50,7 +50,15 @@ export default async function DashboardHome({
       supabase.from('store_members').select('user_id, roles(name, key)').eq('store_id', store.id),
     ])
 
-    // Données de la période sélectionnée
+    // Contacts WhatsApp
+    const { data: waContactsFetch } = await supabase
+      .from('whatsapp_contacts')
+      .select('id, name, phone, role')
+      .eq('store_id', store.id)
+      .order('position')
+      .order('created_at')
+    const waContacts = (waContactsFetch ?? []) as any[]
+
     const [ordersFetch, todayFetch] = await Promise.all([
       supabase.from('orders').select('id, total, status, customer_name, lines, created_at')
         .eq('store_id', store.id)
@@ -315,8 +323,48 @@ export default async function DashboardHome({
           </div>
         </div>
 
+        {/* Contacts WhatsApp */}
+        {waContacts.length > 0 && (
+          <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden mb-6">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">💬</span>
+                <h2 className="font-bold text-zinc-900">Contacts WhatsApp</h2>
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-500">{waContacts.length}</span>
+              </div>
+              <Link href="/dashboard/settings#whatsapp" className="text-xs font-semibold text-violet-600 hover:text-violet-800">
+                Gérer →
+              </Link>
+            </div>
+            <div className="divide-y divide-zinc-50">
+              {waContacts.map((c: any) => {
+                const roleConf: Record<string, { label: string; cls: string; dot: string }> = {
+                  closer:  { label: 'Closer',     cls: 'bg-violet-100 text-violet-700',  dot: 'bg-violet-500' },
+                  livreur: { label: 'Livreur',    cls: 'bg-amber-100 text-amber-700',    dot: 'bg-amber-500' },
+                  groupe:  { label: 'Groupe WA',  cls: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+                }
+                const cfg = roleConf[c.role] ?? { label: c.role, cls: 'bg-zinc-100 text-zinc-600', dot: 'bg-zinc-400' }
+                return (
+                  <div key={c.id} className="flex items-center gap-3 px-5 py-3">
+                    <div className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${cfg.cls}`}>
+                      <span className="text-sm font-black">{c.name.trim()[0]?.toUpperCase() ?? '?'}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-zinc-800 truncate">{c.name}</p>
+                      {c.role !== 'groupe' && <p className="text-xs text-zinc-400">{c.phone}</p>}
+                    </div>
+                    <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${cfg.cls}`}>
+                      <span className={`size-1.5 rounded-full ${cfg.dot}`} />
+                      {cfg.label}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Dernières commandes */}
-        {recentOrders.length > 0 && (
           <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden mb-6">
             <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100">
               <div className="flex items-center gap-2">
